@@ -1,0 +1,4 @@
+*.vscode
+*.ply
+.vs
+build/
