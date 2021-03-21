@@ -45,8 +45,8 @@ log/
 *.app
 
 # Third Party
-stb_image.h
-glad.c
+# stb_image.h
+# glad.c
 
 # Vscode
 .vscode/
