@@ -1,0 +1,12 @@
+[submodule "lib/BFM-tools"]
+	path = lib/BFM-tools
+	url = git@github.com:Great-Keith/BFM-tools.git
+[submodule "lib/dlib"]
+	path = lib/dlib
+	url = git@github.com:davisking/dlib.git
+[submodule "lib/tinyxml2"]
+	path = lib/tinyxml2
+	url = git@github.com:leethomason/tinyxml2.git
+[submodule "lib/glfw"]
+	path = lib/glfw
+	url = git@github.com:glfw/glfw.git

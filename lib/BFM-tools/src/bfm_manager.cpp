@@ -3,41 +3,133 @@
 
 BaselFaceModelManager::BaselFaceModelManager(
 	std::string strModelPath,
-	unsigned int nVertices,
-	unsigned int nFaces,
-	unsigned int nIdPcs,
-	unsigned int nExprPcs,
 	double *aIntParams, 
-	std::string strShapeMuH5Path,
-	std::string strShapeEvH5Path,
-	std::string strShapePcH5Path,
-	std::string strTexMuH5Path,
-	std::string strTexEvH5Path,
-	std::string strTexPcH5Path,
-	std::string strExprMuH5Path,
-	std::string strExprEvH5Path,
-	std::string strExprPcH5Path,
-	std::string strTriangleListH5Path,
 	unsigned int nLandmarks,
 	std::string strLandmarkIdxPath) :
 	m_strModelPath(strModelPath),
-	m_nVertices(nVertices),
-	m_nFaces(nFaces),
-	m_nIdPcs(nIdPcs),
-	m_nExprPcs(nExprPcs),
 	m_nLandmarks(nLandmarks),
-	m_strLandmarkIdxPath(strLandmarkIdxPath),
-	m_strShapeMuH5Path(strShapeMuH5Path),
-	m_strShapeEvH5Path(strShapeEvH5Path),
-	m_strShapePcH5Path(strShapePcH5Path),
-	m_strTexMuH5Path(strTexMuH5Path),
-	m_strTexEvH5Path(strTexEvH5Path),
-	m_strTexPcH5Path(strTexPcH5Path),
-	m_strExprMuH5Path(strExprMuH5Path),
-	m_strExprEvH5Path(strExprEvH5Path),
-	m_strExprPcH5Path(strExprPcH5Path),
-	m_strTriangleListH5Path(strTriangleListH5Path) 
+	m_strLandmarkIdxPath(strLandmarkIdxPath)
 {
+	if(!fs::exists(strModelPath))
+	{
+		LOG(WARNING) << "Path of Basel Face Model does not exist.";
+	}
+	else
+	{
+		fs::path modelPath(strModelPath);
+		std::string strFn, strExt;
+		
+		strExt = modelPath.extension().string();
+		if(strExt != ".h5")
+		{
+			LOG(ERROR) << "Data type must be hdf5. Unexpected tyoe: " << strExt;
+		}
+		else
+		{
+			strFn = modelPath.stem().string();
+			if(strFn == "model2009-publicmm1-bfm")
+			{
+				LOG(WARNING) << "BFM 2009 does not contain expression.";
+
+				m_strVersion = "2009";
+				m_nVertices = 53490,
+				m_nFaces = 106333,
+				m_nIdPcs = 199,
+				m_nExprPcs = 0,
+				m_strShapeMuH5Path = R"(shape/model/mean)";
+				m_strShapeEvH5Path = R"(shape/model/pcaVariance)";
+				m_strShapePcH5Path = R"(shape/model/pcaBasis)";
+				m_strTexMuH5Path = R"(color/model/mean)";
+				m_strTexEvH5Path = R"(color/model/pcaVariance)";
+				m_strTexPcH5Path = R"(color/model/pcaBasis)";
+				m_strExprMuH5Path = "";
+				m_strExprEvH5Path = "";
+				m_strExprPcH5Path = "";
+				m_strTriangleListH5Path = R"(representer/cells)";
+			}
+			else if(strFn == "model2017-1_bfm_nomouth")
+			{
+				m_strVersion = "2017";
+				m_nVertices = 53149,
+				m_nFaces = 105694,
+				m_nIdPcs = 199,
+				m_nExprPcs = 100,
+				m_strShapeMuH5Path = R"(shape/model/mean)";
+				m_strShapeEvH5Path = R"(shape/model/pcaVariance)";
+				m_strShapePcH5Path = R"(shape/model/pcaBasis)";
+				m_strTexMuH5Path = R"(color/model/mean)";
+				m_strTexEvH5Path = R"(color/model/pcaVariance)";
+				m_strTexPcH5Path = R"(color/model/pcaBasis)";
+				m_strExprMuH5Path = R"(expression/model/mean)";
+				m_strExprEvH5Path = R"(expression/model/pcaVariance)";
+				m_strExprPcH5Path = R"(expression/model/pcaBasis)";
+				m_strTriangleListH5Path = R"(representer/cells)";
+			}
+			else if(strFn == "model2017-1_face12_nomouth")
+			{
+				m_strVersion = "2017-face12";
+				m_nVertices = 28588,
+				m_nFaces = 56572,
+				m_nIdPcs = 199,
+				m_nExprPcs = 100,
+				m_strShapeMuH5Path = R"(shape/model/mean)";
+				m_strShapeEvH5Path = R"(shape/model/pcaVariance)";
+				m_strShapePcH5Path = R"(shape/model/pcaBasis)";
+				m_strTexMuH5Path = R"(color/model/mean)";
+				m_strTexEvH5Path = R"(color/model/pcaVariance)";
+				m_strTexPcH5Path = R"(color/model/pcaBasis)";
+				m_strExprMuH5Path = R"(expression/model/mean)";
+				m_strExprEvH5Path = R"(expression/model/pcaVariance)";
+				m_strExprPcH5Path = R"(expression/model/pcaBasis)";
+				m_strTriangleListH5Path = R"(representer/cells)";
+			}
+			else if(strFn == "model2019_bfm")
+			{
+				m_strVersion = "2019";
+				m_nVertices = 47439,
+				m_nFaces = 94464,
+				m_nIdPcs = 199,
+				m_nExprPcs = 100,
+				m_strShapeMuH5Path = R"(shape/model/mean)";
+				m_strShapeEvH5Path = R"(shape/model/pcaVariance)";
+				m_strShapePcH5Path = R"(shape/model/pcaBasis)";
+				m_strTexMuH5Path = R"(color/model/mean)";
+				m_strTexEvH5Path = R"(color/model/pcaVariance)";
+				m_strTexPcH5Path = R"(color/model/pcaBasis)";
+				m_strExprMuH5Path = R"(expression/model/mean)";
+				m_strExprEvH5Path = R"(expression/model/pcaVariance)";
+				m_strExprPcH5Path = R"(expression/model/pcaBasis)";
+				m_strTriangleListH5Path = R"(representer/cells)";
+			}
+			else
+			{
+				LOG(WARNING) << "Load an undefined BFM model.";
+				LOG(WARNING) << "Please check:";
+				LOG(WARNING) << "\t(1) Rename data officially downloaded.";
+				LOG(WARNING) << "\t(2) Define my custom data dimension and path.";
+
+				// Custom (Update by yourself)
+				m_strVersion = "Others";
+				m_nVertices = 46990,
+				m_nFaces = 93322,
+				m_nIdPcs = 99,
+				m_nExprPcs = 29,
+				m_strShapeMuH5Path = "shapeMU";
+				m_strShapeEvH5Path = "shapeEV";
+				m_strShapePcH5Path = "shapePC";
+				m_strTexMuH5Path = "texMU";
+				m_strTexEvH5Path = "texEV";
+				m_strTexPcH5Path = "texPC";
+				m_strExprMuH5Path = "expMU";
+				m_strExprEvH5Path = "expEV";
+				m_strExprPcH5Path = "expPC";
+				m_strTriangleListH5Path = "faces";
+				// end of custom
+			}
+		}
+	}
+	
+
 	for(unsigned int iParam = 0; iParam < 4; iParam++)
 		m_aIntParams[iParam] = aIntParams[iParam];
 
@@ -58,6 +150,42 @@ BaselFaceModelManager::BaselFaceModelManager(
 		this->extractLandmarks();
 		this->genLandmarkBlendshape();
 	}
+
+	LOG(INFO) << "Infomation load done.\n";
+
+	LOG(INFO) << "*******************************************";
+	LOG(INFO) << "*********** Load Basel Face Model *********";
+	LOG(INFO) << "*******************************************";
+	LOG(INFO) << "Version:\t" << m_strVersion;
+	LOG(INFO) << "Number of vertices:\t" << m_nVertices;
+	LOG(INFO) << "Number of faces:\t" << m_nFaces;
+	LOG(INFO) << "Number of shape PCs:\t" << m_nIdPcs;
+	LOG(INFO) << "Number of texture PCs:\t" << m_nIdPcs;
+	if(m_strVersion == "2009")
+		LOG(INFO) << "Number of expression PCs:\tNone";
+	else
+		LOG(INFO) << "Number of expression PCs:\t" << m_nExprPcs;
+	if(m_bIsTexStd)
+		LOG(INFO) << "Texture range:\t0.0~1.0\n";
+	else
+		LOG(INFO) << "Texture range:\t0~255\n";
+
+	LOG(INFO) << "********************************************";
+	LOG(INFO) << "************* Load Custom Info *************";
+	LOG(INFO) << "********************************************";
+	LOG(INFO) << "Number of dlib landmarks:\t68";
+	if(m_bUseLandmark)
+	{
+		LOG(INFO) << "Number of custom landmarks:\t" << m_nLandmarks;
+		LOG(INFO) << "Corresponding between dlib and custom:\t" << m_strLandmarkIdxPath;
+	}
+	else
+		LOG(INFO) << "Number of custom landmarks:\tNone";
+	LOG(INFO) << "Camera intrinsic parameters (fx, fy, cx, cy):";
+	LOG(INFO) << "\t" << m_aIntParams[0] << "\t" << m_aIntParams[1]
+			  << "\t" << m_aIntParams[2] << "\t" << m_aIntParams[3];
+	LOG(INFO) << "\n";
+
 	this->genAvgFace();
 }
 
@@ -108,7 +236,7 @@ bool BaselFaceModelManager::load() {
 	float *vecExprMu = new float[m_nVertices * 3];
 	float *vecExprEv = new float[m_nExprPcs];
 	float *matExprPc = new float[m_nVertices * 3 * m_nExprPcs];
-	unsigned int *vecTriangleList = new unsigned int[m_nFaces * 3];
+	unsigned short *vecTriangleList = new unsigned short[m_nFaces * 3];
 
 	hid_t file = H5Fopen(m_strModelPath.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
 
@@ -124,13 +252,18 @@ bool BaselFaceModelManager::load() {
 	bfm_utils::LoadH5Model(file, m_strExprEvH5Path, vecExprEv, m_vecExprEv, H5T_NATIVE_FLOAT);
 	bfm_utils::LoadH5Model(file, m_strExprPcH5Path, matExprPc, m_matExprPc, H5T_NATIVE_FLOAT);
 	
-	bfm_utils::LoadH5Model(file, m_strTriangleListH5Path, vecTriangleList, m_vecTriangleList, H5T_NATIVE_UINT32);
+	bfm_utils::LoadH5Model(file, m_strTriangleListH5Path, vecTriangleList, m_vecTriangleList, H5T_NATIVE_UINT16);
 
-	std::cout << "status: " << H5Fclose(file) << std::endl;
-	// m_vecShapeMu = m_vecShapeMu * 1000.0;
-	m_vecShapeMu = m_vecShapeMu * 0.01;
-	m_vecExprMu = m_vecExprMu * 0.01;
-	std::cout << m_vecShapeMu(0) << " " << m_vecShapeMu(1) << " " << m_vecShapeMu(2) << std::endl;
+	delete[] vecShapeMu;
+	delete[] vecShapeEv;
+	delete[] matShapePc;
+	delete[] vecTexMu;
+	delete[] vecTexEv;
+	delete[] matTexPc;
+	delete[] vecExprMu;
+	delete[] vecExprEv;
+	delete[] matExprPc;
+	delete[] vecTriangleList;
 
 	if(m_bUseLandmark)
 	{
@@ -326,7 +459,7 @@ void BaselFaceModelManager::accExtParams(double *aExtParams)
 void BaselFaceModelManager::writePly(std::string fn, long mode) const 
 {
 	std::ofstream out;
-	/* Note: In Linux Cpp, we should use std::ios::BFM_OUT as flag, which is not necessary in Windows */
+	/* Note: In Linux Cpp, we should use std::ios::out as flag, which is not necessary in Windows */
 	out.open(fn, std::ios::out | std::ios::binary);
 	if (!out) 
 	{
@@ -369,6 +502,9 @@ void BaselFaceModelManager::writePly(std::string fn, long mode) const
 
 		if(mode & ModelWriteMode_CameraCoord) 
 		{
+			x *= m_scale;
+			y *= m_scale;
+			z *= m_scale;
 			bfm_utils::Trans(m_aExtParams, x, y, z);
 			// y = -y; z = -z;
 		}
@@ -410,6 +546,8 @@ void BaselFaceModelManager::writePly(std::string fn, long mode) const
 		int x = m_vecTriangleList(iFace * 3) - 1;
 		int y = m_vecTriangleList(iFace * 3 + 1) - 1;
 		int z = m_vecTriangleList(iFace * 3 + 2) - 1;
+		if(iFace < 10)
+			std::cout << x << " " << y << " " << z << std::endl;
 		out.write((char *)&y, sizeof(y));
 		out.write((char *)&x, sizeof(x));
 		out.write((char *)&z, sizeof(z));
@@ -421,7 +559,7 @@ void BaselFaceModelManager::writePly(std::string fn, long mode) const
 
 void BaselFaceModelManager::writeLandmarkPly(std::string fn) const {
 	std::ofstream out;
-	/* Note: In Linux Cpp, we should use std::ios::BFM_OUT as flag, which is not necessary in Windows */
+	/* Note: In Linux Cpp, we should use std::ios::out as flag, which is not necessary in Windows */
 	out.open(fn, std::ios::out | std::ios::binary);
 	if (!out) 
 	{

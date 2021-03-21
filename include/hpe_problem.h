@@ -7,11 +7,17 @@
 #include <dlib/gui_widgets.h>
 #include <dlib/image_io.h>
 #include <dlib/opencv.h>
+
 #include <opencv2/highgui/highgui.hpp>
+
 #include <iostream>
 #include <fstream>
 #include <assert.h>
+
 #include "ceres/ceres.h"
+
+#include "glog/logging.h"
+
 #include "string_utils.h"
 #include "io_utils.h"
 #include "functor/functor.h"
@@ -19,10 +25,12 @@
 #include "data_manager.h"
 
 
+using FullObjectDetection = dlib::full_object_detection;
 using DetPairVector = std::vector<std::pair<FullObjectDetection, int>>;
 using Eigen::Matrix;
 using Eigen::Vector3d;
 using Eigen::VectorXd;
+using Summary = ceres::Solver::Summary;
 
 
 #define CERES_INIT(N_ITERATIONS, N_THREADS, B_STDCOUT) \
@@ -31,7 +39,6 @@ using Eigen::VectorXd;
  		options.num_threads = N_THREADS; \
 		options.minimizer_progress_to_stdout = B_STDCOUT; \
 		ceres::Solver::Summary summary;
-
 
 
 class HeadPoseEstimationProblem 
@@ -58,14 +65,15 @@ public:
 	inline BaselFaceModelManager *getModel() { return m_pModel; }
 
 	void solve();
-	ceres::Solver::Summary estExtParams(const DetPairVector&  aObjDets, double *pExtParams);
-	void estShapeCoef();
-	void estExprCoef();
+	
+	void estExtParams(double *pPoints, double dScMean);
+	Summary estExtParams(const DetPairVector&  aObjDets);
+	Summary estShapeCoef(const DetPairVector&  aObjDets);
+	Summary estExprCoef(const DetPairVector&  aObjDets);
 	
 	inline void setObservedPoints(FullObjectDetection *pObservedPoints) { m_pObservedPoints = pObservedPoints; }
 
 	bool solveExtParams(long mode = SolveExtParamsMode_UseCeres, double ca = 1.0, double cb = 0.0);
-
 
 	bool solveShapeCoef();
 
@@ -81,7 +89,6 @@ private:
 
 	bool is_close_enough(double *ext_params, double rotation_eps = 0, double translation_eps = 0);
 	
-	double m_aExtParams[3 + 24 * 3];
 	std::vector<std::pair<FullObjectDetection, int>> m_aObjDetections;
 	FullObjectDetection* m_pObservedPoints;
 	BaselFaceModelManager *m_pModel;

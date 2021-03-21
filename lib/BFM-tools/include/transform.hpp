@@ -164,6 +164,17 @@ namespace bfm_utils {
 		Map<Matrix<_Tp, Dynamic, 3, Eigen::RowMajor>> matPoints(vecPointsTypeTurned.data(), vecPointsTypeTurned.rows() / 3, 3);
 		Matrix<_Tp, 4, Dynamic> matPointsTransposed = matPoints.rowwise().homogeneous().transpose();
 		Matrix<_Tp, 3, Dynamic> matPointsTransformed = (matTrans * matPointsTransposed).topRows(3);
+		
+		// DEBUG
+		// Map<Matrix<_Tp, Dynamic, 1>> tmp(matPointsTransformed.transpose().data(), vecPoints.rows(), 1);
+		// std::cout << "QUICK CHECK" << std::endl;
+		// std::cout << matTrans << std::endl;
+		// std::cout << vecPointsTypeTurned(0) << " " << vecPointsTypeTurned(1) << " " << vecPointsTypeTurned(2) << std::endl;
+		// std::cout << matPoints(0, 0) << " " << matPoints(0, 1) << " " << matPoints(0, 2) << std::endl;
+		// std::cout << matPointsTransposed(0, 0) << " " << matPointsTransposed(1, 0) << " " << matPointsTransposed(2, 0) << " " << matPointsTransposed(3, 0) << std::endl;
+		// std::cout << matPointsTransformed(0, 0) << " " << matPointsTransformed(1, 0) << " " << matPointsTransformed(2, 0) << std::endl;
+		// std::cout << tmp(0) << " " << tmp(1) << " " << tmp(2) << std::endl;
+
 		return Map<Matrix<_Tp, Dynamic, 1>>(matPointsTransformed.transpose().data(), vecPoints.rows(), 1);
 	}
 
@@ -177,9 +188,13 @@ namespace bfm_utils {
 		const double &dTy    = aExtParams[4];
 		const double &dTz    = aExtParams[5];
 
-		double c1 = cos(dRoll * M_PI / 180.0), s1 = sin(dRoll * M_PI / 180.0);
-		double c2 = cos(dYaw * M_PI / 180.0), s2 = sin(dYaw * M_PI / 180.0);
-		double c3 = cos(dPitch * M_PI / 180.0), s3 = sin(dPitch * M_PI / 180.0);
+		// double c1 = cos(dRoll * M_PI / 180.0), s1 = sin(dRoll * M_PI / 180.0);
+		// double c2 = cos(dYaw * M_PI / 180.0), s2 = sin(dYaw * M_PI / 180.0);
+		// double c3 = cos(dPitch * M_PI / 180.0), s3 = sin(dPitch * M_PI / 180.0);
+
+		double c1 = cos(dRoll), s1 = sin(dRoll);
+		double c2 = cos(dYaw), s2 = sin(dYaw);
+		double c3 = cos(dPitch), s3 = sin(dPitch);
 
 		_Tp beforeX = x, beforeY = y, beforeZ = z; 
 

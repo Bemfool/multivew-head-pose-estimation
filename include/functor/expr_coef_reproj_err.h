@@ -6,79 +6,93 @@
 #include "db_params.h"
 
 using FullObjectDetection = dlib::full_object_detection;
+using DetPairVector = std::vector<std::pair<FullObjectDetection, int>>;
 using Eigen::Matrix;
 using ceres::CostFunction;
 using ceres::AutoDiffCostFunction;
 
+
 class MultiExprCoefReprojErr {
 public:                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
 	MultiExprCoefReprojErr(
-		std::vector<std::pair<dlib::full_object_detection, int>> &aObjDetections, 
+		const DetPairVector &aObjDetections, 
 		BaselFaceModelManager *model, 
-		DataManager* pDataManager,
-		double* pExtParams) : 
+		DataManager* pDataManager) : 
 		m_aObjDetections(aObjDetections), 
 		m_pModel(model), 
-		m_pDataManager(pDataManager),
-		m_pExtParams(pExtParams) { }
+		m_pDataManager(pDataManager) { }
 	
     template<typename _Tp>
 	bool operator () (const _Tp* const aExprCoef, _Tp* aResiduals) const {
-		_Tp fx = _Tp(m_pModel->getFx()), fy = _Tp(m_pModel->getFy());
-		_Tp cx = _Tp(m_pModel->getCx()), cy = _Tp(m_pModel->getCy());
-		const std::vector<Eigen::Matrix4f>& aMatCams = m_pDataManager->getCameraMatrices();
+		_Tp fx, fy, cx, cy;
+		_Tp *pExtParams;
+		_Tp scale;
+		_Tp u, v, invZ;
+		int iFace;
+		auto len = m_aObjDetections.size();
+		
+		// Fetch intrinsic parameters
+		fx = static_cast<_Tp>(m_pModel->getFx());
+		fy = static_cast<_Tp>(m_pModel->getFy());
+		cx = static_cast<_Tp>(m_pModel->getCx());
+		cy = static_cast<_Tp>(m_pModel->getCy());
+		
+		// Fetch camera matrix array
+		const auto& aMatCams = m_pDataManager->getCameraMatrices();
 
-		const Matrix<_Tp, Dynamic, 1> vecPts = m_pModel->genLandmarkBlendshapeByExpr(aExprCoef);  
+		// Fetch extrinsic parameters and scale
+		const double* pdExtParams = m_pModel->getExtParams();
+		pExtParams = new _Tp[N_EXT_PARAMS];
+		for(auto i = 0u; i < N_EXT_PARAMS; i++) 
+			pExtParams[i] = static_cast<_Tp>(pdExtParams[i]);
+		scale = static_cast<_Tp>(m_pModel->getMutableScale());
 
-		for(unsigned int iPhoto = 0; iPhoto < m_aObjDetections.size(); iPhoto++)
+		// Generate blendshape with expression coefficients and transform 
+		const Matrix<_Tp, Dynamic, 1> vecPts = m_pModel->genLandmarkBlendshapeByExpr(aExprCoef) * scale;  
+		const Matrix<_Tp, Dynamic, 1> vecPtsMC = bfm_utils::TransPoints(pExtParams, vecPts);
+
+		// Compute Euler Distance between landmark and transformed model points in every photos
+		for(auto i = 0u; i < len; i++)
 		{
-			int idx = m_aObjDetections[iPhoto].second;
-			_Tp pExtParams[6] = {
-				(_Tp)m_pExtParams[0], (_Tp)m_pExtParams[1], (_Tp)m_pExtParams[2],
-				(_Tp)m_pExtParams[3 + idx * 3], (_Tp)m_pExtParams[3 + idx * 3 + 1], (_Tp)m_pExtParams[3 + idx * 3 + 2]
-			};
-
- 			const Eigen::Matrix<_Tp, 4, 4> matCam = aMatCams[idx].template cast<_Tp>();
-
-			const Matrix<_Tp, Dynamic, 1> vecPtsMC = bfm_utils::TransPoints(pExtParams, vecPts);
+			iFace = m_aObjDetections[i].second;
+ 			const Matrix<_Tp, 4, 4> matCam = aMatCams[iFace].template cast<_Tp>();
 			const Matrix<_Tp, Dynamic, 1> vecPtsWC = bfm_utils::TransPoints(matCam, vecPtsMC);
-			for(unsigned int iLandmark = 0; iLandmark < N_LANDMARKS; iLandmark++) 
+			for(auto j = 0u; j < N_LANDMARKS; j++) 
 			{
-				_Tp u = fx * vecPtsWC(iLandmark * 3) / vecPtsWC(iLandmark * 3 + 2) + cx;
-				_Tp v = fy * vecPtsWC(iLandmark * 3 + 1) / vecPtsWC(iLandmark * 3 + 2) + cy;
-				aResiduals[iPhoto * N_LANDMARKS * 2 + iLandmark * 2] = _Tp(m_aObjDetections[iPhoto].first.part(iLandmark).x()) - u;
-				aResiduals[iPhoto * N_LANDMARKS * 2 + iLandmark * 2 + 1] = _Tp(m_aObjDetections[iPhoto].first.part(iLandmark).y()) - v;
+				invZ = static_cast<_Tp>(1.0) / vecPtsWC(j * 3 + 2);
+				u = fx * vecPtsWC(j * 3) * invZ + cx;
+				v = fy * vecPtsWC(j * 3 + 1) * invZ + cy;
+				aResiduals[i * N_LANDMARKS * 2 + j * 2] = static_cast<_Tp>(m_aObjDetections[i].first.part(j).x()) - u;
+				aResiduals[i * N_LANDMARKS * 2 + j * 2 + 1] = static_cast<_Tp>(m_aObjDetections[i].first.part(j).y()) - v;
 			}
 		}
 
-		for(unsigned int iPhoto = m_aObjDetections.size();+ iPhoto < N_PHOTOS; iPhoto++)
-		{
-			for(unsigned int iLandmark = 0; iLandmark < N_LANDMARKS; iLandmark++)
-			{
-				aResiduals[iPhoto * N_LANDMARKS * 2 + iLandmark * 2] = _Tp(0.0);
-				aResiduals[iPhoto * N_LANDMARKS * 2 + iLandmark * 2 + 1] = _Tp(0.0);
-			}
-		}
+		// Empty residuals
+		for(auto i = len; i < N_PHOTOS; i++)
+			for(auto j = 0u; j < N_LANDMARKS; j++)
+				aResiduals[i * N_LANDMARKS * 2 + j * 2]
+				 = aResiduals[i * N_LANDMARKS * 2 + j * 2 + 1]
+				 = static_cast<_Tp>(0.0);
 
-		for(auto i = 0; i < N_EXPR_PCS; i++)
-			aResiduals[N_LANDMARKS * 2 * N_PHOTOS + i] = _Tp(m_dWeight) * aExprCoef[i];
+		// Regularization
+		for(auto i = 0u; i < N_EXPR_PCS; i++)
+			aResiduals[N_RES + i] = static_cast<_Tp>(m_dWeight) * aExprCoef[i];
 
 
 		return true;
 	}
 
-	static ceres::CostFunction *create(
-		std::vector<std::pair<dlib::full_object_detection, int>> &aObjDetections, 
+	static CostFunction *create(
+		const DetPairVector &aObjDetections, 
 		BaselFaceModelManager* model, 
-		DataManager* pDataManager,
-		double* pExtParams) 
+		DataManager* pDataManager) 
 	{
-		return (new ceres::AutoDiffCostFunction<MultiExprCoefReprojErr, N_LANDMARKS * 2 * N_PHOTOS + N_EXPR_PCS, N_EXPR_PCS>(
-			new MultiExprCoefReprojErr(aObjDetections, model, pDataManager, pExtParams)));
+		return (new AutoDiffCostFunction<MultiExprCoefReprojErr, N_RES + N_EXPR_PCS, N_EXPR_PCS>(
+			new MultiExprCoefReprojErr(aObjDetections, model, pDataManager)));
 	}
 
 private:
-	std::vector<std::pair<dlib::full_object_detection, int>> m_aObjDetections;
+	DetPairVector m_aObjDetections;
     BaselFaceModelManager *m_pModel;
 	DataManager* m_pDataManager;
 	double* m_pExtParams;

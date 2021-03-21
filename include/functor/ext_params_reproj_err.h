@@ -7,6 +7,7 @@
 #include "db_params.h"
 #include "io_utils.h"
 
+using FullObjectDetection = dlib::full_object_detection;
 using Eigen::VectorXd;
 using Eigen::Matrix;
 using Eigen::Dynamic;
@@ -15,7 +16,7 @@ class MultiExtParamsReprojErr
 {
 public:                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
 	MultiExtParamsReprojErr(
-		const std::vector<std::pair<dlib::full_object_detection, int>> &aObjDetections, 
+		const std::vector<std::pair<FullObjectDetection, int>> &aObjDetections, 
 		BaselFaceModelManager *model, 
 		DataManager* pDataManager) : 
 		m_aObjDetections(aObjDetections), 
@@ -23,54 +24,60 @@ public:
 		m_pDataManager(pDataManager) { }
 	
     template<typename _Tp>
-	bool operator () (const _Tp* const aExtParams, _Tp* aResiduals) const 
+	bool operator () (const _Tp* const pExtParams, const _Tp* const pScale, _Tp* aResiduals) const 
 	{
-		_Tp fx = _Tp(m_pModel->getFx()), fy = _Tp(m_pModel->getFy());
-		_Tp cx = _Tp(m_pModel->getCx()), cy = _Tp(m_pModel->getCy());
+		_Tp fx, fy, cx, cy;
+		_Tp u, v;
+		_Tp invZ;
+		int iFace;
+		
+		// Fetch intrinsic parameters
+		fx = static_cast<_Tp>(m_pModel->getFx());
+		fy = static_cast<_Tp>(m_pModel->getFy());
+		cx = static_cast<_Tp>(m_pModel->getCx());
+		cy = static_cast<_Tp>(m_pModel->getCy());
 
+		// Fetch camera matrix array
 		const std::vector<Eigen::Matrix4f>& aMatCams = m_pDataManager->getCameraMatrices();
 
-		const Matrix<_Tp, Dynamic, 1> vecPts = m_pModel->getLandmarkCurrentBlendshape().template cast<_Tp>();
-		// const Matrix<_Tp, Dynamic, 1> vecRotPts = bfm_utils::TransPoints(aExtParams, vecPts);
+		// Transform
+		const _Tp& scale = *pScale;
+		const Matrix<_Tp, Dynamic, 1> vecPts = m_pModel->getLandmarkCurrentBlendshape().template cast<_Tp>() * scale;
+		const Matrix<_Tp, Dynamic, 1> vecRotPts = bfm_utils::TransPoints(pExtParams, vecPts);
 
-		for(unsigned int iPhoto = 0; iPhoto < m_aObjDetections.size(); iPhoto++)
+		// Compute Euler Distance between landmark and transformed model points in every photos
+		for(auto i = 0u; i < m_aObjDetections.size(); i++)
 		{
-			int idx = m_aObjDetections[iPhoto].second;
-			_Tp aExactExtParams[6] = {
-				aExtParams[0], aExtParams[1], aExtParams[2], 
-				aExtParams[3 + idx * 3], aExtParams[3 + idx * 3 + 1], aExtParams[3 + idx * 3 + 2]};
-			const Matrix<_Tp, Dynamic, 1> vecRotPts = bfm_utils::TransPoints(aExactExtParams, vecPts);
-
- 			const Eigen::Matrix<_Tp, 4, 4> matCam = aMatCams[idx].template cast<_Tp>();
-
+			iFace = m_aObjDetections[i].second;
+ 			const Eigen::Matrix<_Tp, 4, 4> matCam = aMatCams[iFace].template cast<_Tp>();
 			const Matrix<_Tp, Dynamic, 1> vecTranPts = bfm_utils::TransPoints(matCam, vecRotPts);
-			for(unsigned int iLandmark = 0; iLandmark < N_LANDMARKS; iLandmark++) 
+
+			for(auto j = 0; j < N_LANDMARKS; j++) 
 			{
-				_Tp x = vecTranPts(iLandmark * 3);
-				_Tp y = vecTranPts(iLandmark * 3 + 1);
-				_Tp z = vecTranPts(iLandmark * 3 + 2);
-				_Tp u = fx * x / z + cx;
-				_Tp v = fy * y / z + cy;
-				aResiduals[iPhoto * N_LANDMARKS * 2 + iLandmark * 2] = _Tp(m_aObjDetections[iPhoto].first.part(iLandmark).x()) - u;
-				aResiduals[iPhoto * N_LANDMARKS * 2 + iLandmark * 2 + 1] = _Tp(m_aObjDetections[iPhoto].first.part(iLandmark).y()) - v;
+				invZ = static_cast<_Tp>(1.0) / vecTranPts(j * 3 + 2);
+				u = fx * vecTranPts(j * 3) * invZ + cx;
+				v = fy * vecTranPts(j * 3 + 1) * invZ + cy;
+				aResiduals[i * N_LANDMARKS * 2 + j * 2] = static_cast<_Tp>(m_aObjDetections[i].first.part(j).x()) - u;
+				aResiduals[i * N_LANDMARKS * 2 + j * 2 + 1] = static_cast<_Tp>(m_aObjDetections[i].first.part(j).y()) - v;
 			}
 		}
 
-		for(unsigned int iPhoto = m_aObjDetections.size();+ iPhoto < N_PHOTOS; iPhoto++)
-		{
-			for(unsigned int iLandmark = 0; iLandmark < N_LANDMARKS; iLandmark++)
-			{
-				aResiduals[iPhoto * N_LANDMARKS * 2 + iLandmark * 2] = _Tp(0.0);
-				aResiduals[iPhoto * N_LANDMARKS * 2 + iLandmark * 2 + 1] = _Tp(0.0);
-			}
-		}
+		// Empty residuals
+		for(auto i = m_aObjDetections.size(); i < N_PHOTOS; i++)
+			for(auto j = 0u; j < N_LANDMARKS; j++)
+				aResiduals[i * N_LANDMARKS * 2 + j * 2]
+				 = aResiduals[i * N_LANDMARKS * 2 + j * 2 + 1]
+				 = static_cast<_Tp>(0.0);
+
+		// Regularization
+		aResiduals[N_RES] = static_cast<_Tp>(m_scWeight) * (scale - static_cast<_Tp>(m_scMean));
 
 		return true;
 	}
 
 	static ceres::CostFunction *create(const std::vector<std::pair<dlib::full_object_detection, int>> &aObjDetections, BaselFaceModelManager *model, DataManager* pDataManager) 
 	{
-		return (new ceres::AutoDiffCostFunction<MultiExtParamsReprojErr, N_LANDMARKS * 2 * N_PHOTOS, 3 + 24 * 3>(
+		return (new ceres::AutoDiffCostFunction<MultiExtParamsReprojErr, N_LANDMARKS * 2 * N_PHOTOS + 1, N_EXT_PARAMS, 1>(
 			new MultiExtParamsReprojErr(aObjDetections, model, pDataManager)));
 	}
 
@@ -78,8 +85,68 @@ private:
 	std::vector<std::pair<dlib::full_object_detection, int>> m_aObjDetections;
     BaselFaceModelManager *m_pModel;
 	DataManager* m_pDataManager;
+	double m_scWeight = 1e6;
+	double m_scMean = 0.0075;
 };
 
+
+class MultiExtParams3D3DReprojErr 
+{
+public:                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
+	MultiExtParams3D3DReprojErr(
+		double *pPoints, 
+		double dScMean, 
+		BaselFaceModelManager *model, 
+		DataManager* pDataManager) : 
+		m_pPoints(pPoints),
+		m_dScMean(dScMean),
+	    m_pModel(model), 
+		m_pDataManager(pDataManager) { }
+	
+    template<typename _Tp>
+	bool operator () (const _Tp* const pExtParams, _Tp* aResiduals) const 
+	{
+		_Tp fx, fy, cx, cy;
+		_Tp u, v;
+		_Tp invZ;
+		int iFace;
+		
+		// Fetch intrinsic parameters
+		fx = static_cast<_Tp>(m_pModel->getFx());
+		fy = static_cast<_Tp>(m_pModel->getFy());
+		cx = static_cast<_Tp>(m_pModel->getCx());
+		cy = static_cast<_Tp>(m_pModel->getCy());
+
+		// Fetch camera matrix array
+		const std::vector<Eigen::Matrix4f>& aMatCams = m_pDataManager->getCameraMatrices();
+
+		// Transform
+		const Matrix<_Tp, Dynamic, 1> vecPts = m_pModel->getLandmarkCurrentBlendshape().template cast<_Tp>() * (_Tp)m_dScMean;
+		const Matrix<_Tp, Dynamic, 1> vecRotPts = bfm_utils::TransPoints(pExtParams, vecPts);
+
+		for(auto i = 0u; i < N_LANDMARKS; i++)
+		{
+			aResiduals[i * 3] = vecRotPts(i * 3) - m_pPoints[i * 3];
+			aResiduals[i * 3 + 1] = vecRotPts(i * 3 + 1) - m_pPoints[i * 3 + 1];
+			aResiduals[i * 3 + 2] = vecRotPts(i * 3 + 2) - m_pPoints[i * 3 + 2];
+		}
+
+		return true;
+	}
+
+	static ceres::CostFunction *create(double *pPoints, double dScMean, BaselFaceModelManager *model, DataManager* pDataManager) 
+	{
+		return (new ceres::AutoDiffCostFunction<MultiExtParams3D3DReprojErr, N_LANDMARKS * 3, N_EXT_PARAMS>(
+			new MultiExtParams3D3DReprojErr(pPoints, dScMean, model, pDataManager)));
+	}
+
+private:
+	double *m_pPoints;
+    BaselFaceModelManager *m_pModel;
+	DataManager* m_pDataManager;
+	double m_scWeight = 1e6;
+	double m_dScMean = 0.0075;
+};
 
 
 

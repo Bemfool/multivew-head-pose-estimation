@@ -57,7 +57,6 @@ namespace bfm_utils
 		hid_t dataSet = H5Dopen(file, strPath.c_str(), H5P_DEFAULT);
 		herr_t status = H5Dread(dataSet, predType, H5S_ALL, H5S_ALL, H5P_DEFAULT, aData);
 		Raw2Mat(matData, aData);
-		std::cout << "status: " << H5Dclose(dataSet) << std::endl;
 	}
 
 

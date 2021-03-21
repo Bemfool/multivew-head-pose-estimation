@@ -1,14 +1,16 @@
 #ifndef DATA_MANAGER
 #define DATA_MANAGER
 
+#include "db_params.h"
 #include "file_utils.h"
-#include "model.h"
 #include "texture.h"
 
 #include "tinyxml2.h"
 #include <Eigen/Dense>
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
+
+#include "glog/logging.h"
 
 #include <fstream>
 #include <string>
@@ -18,60 +20,61 @@
 using namespace tinyxml2;
 using namespace boost::filesystem;
 
+
+/*
+ * Directory:
+ * 	-root
+ * 		- image: Folder containing images;
+ * 		- cam.xml: Camer<a information, exmaple format as follows:
+ * 	
+ * <?xml version="1.0" encoding="UTF-8"?>
+ * <document version="1.4.0">
+ *     <chunk>
+ *         <transform>
+ *             <rotation locked="0">-4 -1 -9 9 5 -5 6 -9 1</rotation>
+ *             <translation locked="0">-6 -1 -4</translation>
+ *         </transform>
+ *         <sensors next_id="1">
+ *             <calibration type="frame" class="adjusted">
+ *                 <resolution width="6000" height="4000"/>
+ *                 <f>13992</f>
+ *                 <cx>-27</cx>
+ *                 <cy>39</cy>
+ *                 <k1>0</k1>
+ *                 <k2>1</k2>
+ *                 <k3>-2</k3>
+ *                 <p1>-0</p1>
+ *                 <p2>0</p2>
+ *             </calibration>	  
+ * 		       <sensor id = "0">
+ * 	       </sensors>
+ *         <cameras next_id="2">
+ *             <camera id = "0">
+ *                 <transform>1 0 0 0 0 -1 -1 0 0 1 -1 0 0 0 0 1</transform>          
+ *             </camera>
+ * 			   <camera id = "1">
+ *                 <transform>9 3 2 -1 -4 -9 1 6 2 -2 -9 1 0 0 0 1</transform>
+ *             </camera>
+ *         </cameras>
+ *     </chunk>
+ * </document>
+ */
+
+
+
 class DataManager
 {
 public:
 	DataManager(const std::string &rootDir) :
 		m_pathRootDir(path(rootDir)),
-		m_pathLandmarkDir(m_pathRootDir / "face_landmarks"),
 		m_pathPhotoDir(m_pathRootDir / "image"),
-		m_pathXml(m_pathRootDir / "cam.xml"),
-		m_pathModel(m_pathRootDir / "photoscan.ply")
+		m_pathXml(m_pathRootDir / "cam.xml")
 	{
-		std::cout << "Init Data Manager" << std::endl;
-		m_model = new Model(m_pathModel.string());
+		
+		LOG(INFO) << "Init data manager";
 		this->loadCamInfo();
-		this->loadLandmarks();
 		this->loadTextures();
-
-		Eigen::Matrix3f matR = m_matModel.inverse().block(0, 0, 3, 3);
-		std::cout << matR << std::endl;
-
- 		Eigen::Vector3f eulerAngles = matR.eulerAngles(0, 2, 1);
-		std::cout << "Roll: " << eulerAngles(0) << "("  << (eulerAngles(0) * 180.0 / M_PI) << ")" << std::endl;
-		std::cout << "Yaw: " << eulerAngles(1) << "("  << (eulerAngles(1) * 180.0 / M_PI) << ")" << std::endl;
-		std::cout << "Pitch: " << eulerAngles(2) << "("  << (eulerAngles(2) * 180.0 / M_PI) << ")" << std::endl;
-
-		for(auto i = 0; i < m_aCameraMatrices.size(); i++)
-		{
-			Eigen::Matrix4f matCam = m_aCameraMatrices[i];
-			std::cout << "Cam: " << i << std::endl;
-			Eigen::Matrix3f matR = matCam.block(0, 0, 3, 3);
-			Eigen::Vector3f eulerAngles = matR.eulerAngles(0, 2, 1);
-			std::cout << "Roll: " << eulerAngles(0) << "("  << (eulerAngles(0) * 180.0 / M_PI) << ")" << std::endl;
-			std::cout << "Yaw: " << eulerAngles(1) << "("  << (eulerAngles(1) * 180.0 / M_PI) << ")" << std::endl;
-			std::cout << "Pitch: " << eulerAngles(2) << "("  << (eulerAngles(2) * 180.0 / M_PI) << ")" << std::endl;
-			Eigen::Vector4f vecT = matCam.col(3);
-			std::cout << vecT.transpose() << std::endl;
-		}
 	}
-
-	void saveLandmarks(unsigned int iPickedFace) const
-	{
-		std::cout << "save landmark from face " << iPickedFace << std::endl;
-		path landmarkFile = m_pathLandmarkDir / (file_utils::Id2Str(iPickedFace) + ".txt");
-		rename(landmarkFile, path(m_pathLandmarkDir / (file_utils::Id2Str(iPickedFace)
-			+ "_" + std::to_string(glfwGetTime()) + ".backup")));
-		std::ofstream out(landmarkFile.string());
-		auto landmarkCoords = m_aLandmarkCoordsSets[iPickedFace];
-		for (auto it = landmarkCoords.begin(); it != landmarkCoords.end(); it++)
-		{
-			out << std::scientific << std::setprecision(19) << *it << " " << *(++it) << "\n";
-		}
-		out.close();
-	}
-
-	const Model *getModel() const { return m_model; }
 
 	double getF() const { return m_f; }
 	double getCx() const { return m_cx; }
@@ -79,8 +82,6 @@ public:
 	double getWidth() const { return m_width; }
 	double getHeight() const { return m_height; }
 	unsigned int getFaces() const { return m_nFaces; }
-
-	const Eigen::Matrix4f& getMatModel() const { return m_matModel; }
 
 	const std::vector<Eigen::Matrix<float, 4, 4>>& getCameraMatrices() const {return m_aCameraMatrices; }
 	const std::vector<Eigen::Matrix<float, 3, 4>>& getProjMatrices() const { return m_aProjMatrices; }
@@ -92,10 +93,7 @@ public:
 	path m_pathRootDir;
 	path m_pathLandmarkDir;
 	path m_pathPhotoDir;
-	path m_pathModel;
 	path m_pathXml;
-
-	Model *m_model;
 
 	// camera infomation
 	double m_f;
@@ -117,9 +115,9 @@ public:
 
 private:
 
-	int loadCamInfo()
+	Status loadCamInfo()
 	{
-		std::cout << "Load camera information" << std::endl;
+		LOG(INFO) << "Load camera information";
 		m_matModel = Eigen::Matrix4f::Identity();
 
 		m_aProjMatrices.clear();
@@ -140,15 +138,15 @@ private:
 		XMLDocument doc;
 		if(doc.LoadFile(m_pathXml.string().c_str()) != XML_SUCCESS)
 		{
-			std::cout << "XML load failed." << std::endl;
-			return -1;
+			LOG(ERROR) << "XML load failed.";
+			return Status_Error;
 		}
 
 		XMLElement *root = doc.RootElement();
-		XMLElement *chunk = root->FirstChildElement("chunk");  //document->chunk->sensors
+		XMLElement *chunk = root->FirstChildElement("chunk"); 
 		if (chunk != NULL)
 		{
-			//model transform
+			// model transform
 			XMLElement *xml_transform = chunk->FirstChildElement("transform");
 			if (xml_transform != NULL)
 			{
@@ -186,8 +184,7 @@ private:
 			XMLElement *xml_sensors = chunk->FirstChildElement("sensors");
 			if (xml_sensors != NULL)
 			{
-				int sensorNum = atoi(xml_sensors->Attribute("next_id"));
-				cout << "sensor nums: " << sensorNum << endl;
+				sensorNum = atoi(xml_sensors->Attribute("next_id"));
 
 				// intial sensor size
 				sensor_f.resize(sensorNum);
@@ -278,7 +275,10 @@ private:
 					P = K * T;
 
 					m_aCameraMatrices.push_back(T_camera.inverse());
+					// m_aCameraMatrices.push_back(T_camera);
+
 					m_aProjMatrices.push_back(P);
+					// std::cout << T << "\n" << std::endl;
 					m_aTransMatrices.push_back(T.block(0, 0, 3, 4));
 					m_aInvTransMatrices.push_back(T.inverse());
 
@@ -300,69 +300,22 @@ private:
 		m_width = sensor_w[0];
 		m_height = sensor_h[0];
 
-		return 0;
+		return Status_Ok;
 	}
+	
 
-	void loadLandmarks()
+	Status loadTextures()
 	{
-		std::cout << "Load landmarks" << std::endl;
-		m_aLandmarkCoordsSets.resize(m_nFaces);
-		path path(m_pathLandmarkDir);
-
-		if (!exists(path))
-		{
-			std::cout << "Error: Path " << m_pathLandmarkDir << " does not exist." << std::endl;
-			return;
-		}
-
-		for (directory_iterator iter(m_pathLandmarkDir); iter != directory_iterator(); iter++)
-		{
-			if (iter->path().extension() != ".txt")
-				continue;
-
-			unsigned int camera_id = file_utils::Str2Id(iter->path().stem().string());
-			std::string filename = iter->path().string();
-			std::cout << "Load landmarks from: " << filename;
-
-			std::ifstream in(filename);
-			if (!in)
-			{
-				std::cout << "\nError: Can not open " << iter->path().string() << "." << std::endl;
-				return;
-			}
-			std::string line;
-			while (std::getline(in, line))
-			{
-				if (line.empty() || line == "\n")
-					continue;
-				std::vector<std::string> words;
-				boost::split(words, line, boost::is_any_of(" "));
-				m_aLandmarkCoordsSets[camera_id].push_back(std::stof(words[0]));
-				m_aLandmarkCoordsSets[camera_id].push_back(std::stof(words[1]));
-			}
-			std::cout << " - " << m_aLandmarkCoordsSets[camera_id].size() << std::endl;
-		}
-	}
-
-	void loadTextures()
-	{
+		LOG(INFO) << "Load textures";
 		m_aTextures.resize(m_nFaces);
 		for (auto iFace = 0; iFace < m_nFaces; iFace++)
 		{
 			path pathTexture = m_pathPhotoDir / (file_utils::Id2Str(iFace) + ".jpg");
 			std::cout << "Load texture: " << pathTexture.string() << std::endl;
 			m_aTextures[iFace] = Texture::LoadTexture(pathTexture.string());
-			if (!m_aLandmarkCoordsSets[iFace].empty() && 
-				m_aTextures[iFace].getWidth() > m_aTextures[iFace].getHeight())
-			{
-				if (m_aLandmarkCoordsSets[iFace][0] < m_aTextures[iFace].getWidth() * 0.5)
-					m_aTextures[iFace].setRotateType(RotateType_CCW);
-				else
-					m_aTextures[iFace].setRotateType(RotateType_CW);
-			}
-			else
-				m_aTextures[iFace].setRotateType(RotateType_No);
 		}
+
+		return Status_Ok;
 	}
 };
 

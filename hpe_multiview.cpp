@@ -1,103 +1,103 @@
 #include "hpe_problem.h"
 
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
-
-// #define STB_IMAGE_IMPLEMENTATION
-// #include <stb_image.h>
-#include <shader.h>
-
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-
-void framebufferSizeCallback(GLFWwindow* window, int width, int height);
-void processInput(GLFWwindow *window);
-
-// settings
-const unsigned int SCR_WIDTH = 640;
-const unsigned int SCR_HEIGHT = 480;
+#include <iostream>
+#include <chrono>
+#include <boost/filesystem.hpp>
+#include <boost/program_options.hpp>
 
 
-int main(int argc, char** argv)
+namespace fs = boost::filesystem;
+namespace po = boost::program_options;
+using namespace std;
+
+
+int main(int argc, char* argv[])
 {  
-	google::InitGoogleLogging(argv[0]);
+    // logging
+    google::InitGoogleLogging(argv[0]); 
+    FLAGS_logtostderr = false;
+    if(fs::exists(LOG_PATH)) 
+        fs::remove_all(LOG_PATH);
+    fs::create_directory(LOG_PATH);
+    FLAGS_alsologtostderr = true;
+    FLAGS_log_dir = LOG_PATH;
+    FLAGS_log_prefix = true; 
+    FLAGS_colorlogtostderr =true;
 
-    BFM_DEBUG(PRINT_GREEN "#################### OpenGL Init ####################\n" COLOR_END);
-    // Initialize and configure GLFW
-    glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    // command options
+    po::options_description opts("Options");
+    po::variables_map vm;
 
-#ifdef __APPLE__
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); 
-#endif
+    string projectPath, bfmH5Path;
+    string landmarkIdxPath, dlibLandmarkDetPath;
+    string shapeMuH5Path, shapeEvH5Path, shapePcH5Path;
+    string exprMuH5Path, exprEvH5Path, exprPcH5Path;
 
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Head Pose Estimation - Oneshot", nullptr, nullptr);
-    if (window == nullptr)
+    opts.add_options()
+        ("project_path", po::value<string>(&projectPath)->default_value(
+            R"(/media/keith/SAKURA/face_zzm/project)"), 
+            "Folder containing images and camera information."),
+        ("bfm_h5_path", po::value<string>(&bfmH5Path)->default_value(
+            R"(/home/keith/Data/BaselFaceModel_mod.h5)"), 
+            "Path of Basel Face Model."),
+        ("landmark_idx_path", po::value<string>(&landmarkIdxPath)->default_value(
+            R"(/home/keith/Project/head-pose-estimation/data/example_landmark_68.anl)"), 
+            "Path of corresponding between dlib and model vertex index."),
+        ("dlib_landmark_det_path", po::value<string>(&dlibLandmarkDetPath)->default_value(
+            R"(/home/keith/Data/shape_predictor_68_face_landmarks.dat)"), 
+            "Path of shape_predictor_68_face_landmarks.dat."),
+        ("help,h", "Help message");
+    
+    try
     {
-        BFM_ERROR("Failed to create GLFW window\n");
-        glfwTerminate();
+        po::store(po::parse_command_line(argc, argv, opts), vm);
+    }
+    catch(...)
+    {
+        LOG(ERROR) << "These exists undefined command options.";
         return -1;
     }
-    glfwMakeContextCurrent(window);
-    glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
-    // Load all OpenGL function pointers 
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    po::notify(vm);
+    if(vm.count("help"))
     {
-        BFM_ERROR("Failed to initialize GLAD\n");
-        return -1;
+        LOG(INFO) << opts;
+        return 0;
     }
 
 	HeadPoseEstimationProblem *pHpeProblem = new HeadPoseEstimationProblem();
 	BaselFaceModelManager *pBfmManager = pHpeProblem->getModel();
+
+    /****************** TEST ***********************/
     // pBfmManager->genAvgFace();
-    // pBfmManager->writePly();
+    // pBfmManager->writePly("testAvg.ply", ModelWriteMode_CameraCoord);
+    // pBfmManager->setRoll(3.14);
+    // pBfmManager->writePly("testRot.ply", ModelWriteMode_CameraCoord);
     // return 0;
+    /***********************************************/
 
-	try 
-	{
-        // Start of solving 
-        auto start = std::chrono::system_clock::now();
-        pHpeProblem->solve();
-        
-        // End of solving
-        auto end = std::chrono::system_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-        BFM_DEBUG("Cost of solution: %lf Second\n", 
-            double(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den);             
+    // Start of solving 
+    auto start = std::chrono::system_clock::now();
+    pHpeProblem->solve();
+    
+    // End of solving
+    auto end = std::chrono::system_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    LOG(INFO) << "Cost of solution: "
+        << (double(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den)
+        << " seconds." << std::endl;            
 
-        // Show results 
-        pBfmManager->printExtParams();
-        // pBfmManager->printShapeCoef();
-        // pBfmManager->printExprCoef();
+    // Show results 
+    pBfmManager->printExtParams();
+    // pBfmManager->printShapeCoef();
+    // pBfmManager->printExprCoef();
 
-        // Generate whole face, because before functions only process landmarks
-        pBfmManager->genFace();
+    // Generate whole face, because before functions only process landmarks
+    // pBfmManager->genFace();
 
-        // Write face into .ply model file
-        pBfmManager->writePly("rnd_face.ply", ModelWriteMode_CameraCoord);
+    // Write face into .ply model file
+    // pBfmManager->writePly("rnd_face.ply", ModelWriteMode_CameraCoord);
 
-	} catch (exception& e) {
-        BFM_ERROR("Exception thrown: %s\n", e.what());
-	}
-
-    glfwTerminate();
+    google::ShutdownGoogleLogging();
     return 0;
-}
-
-
-
-void processInput(GLFWwindow *window)
-{
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, true);
-}
-
-
-void framebufferSizeCallback(GLFWwindow* window, int width, int height)
-{
-    glViewport(0, 0, width, height);
 }

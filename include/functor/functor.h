@@ -5,5 +5,6 @@
 #include "ext_params_reproj_err.h"
 #include "shape_coef_reproj_err.h"
 #include "expr_coef_reproj_err.h"
+#include "point_reproj_err.h"
 
 #endif // HPE_FUNCTOR_H

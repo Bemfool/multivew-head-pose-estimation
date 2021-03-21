@@ -12,7 +12,12 @@
 
 #include <Eigen/Dense>
 #include <Eigen/StdVector>
+
 #include <opencv2/core/eigen.hpp>
+
+#include "glog/logging.h"
+
+#include <boost/filesystem.hpp>
 
 
 using Eigen::Matrix;
@@ -21,6 +26,8 @@ using Eigen::MatrixXd;
 using Eigen::Vector3d;
 using Eigen::VectorXd;
 using Eigen::Dynamic;
+
+namespace fs = boost::filesystem;
 
 
 /*
@@ -61,21 +68,7 @@ public:
 	BaselFaceModelManager() = default;
 	BaselFaceModelManager(
 		std::string strModelPath,
-		unsigned int nVertices,
-		unsigned int nFaces,
-		unsigned int nIdPcs,
-		unsigned int nExprPcs,
 		double *aIntParams, 
-		std::string strShapeMuH5Path,
-		std::string strShapeEvH5Path,
-		std::string strShapePcH5Path,
-		std::string strTexMuH5Path,
-		std::string strTexEvH5Path,
-		std::string strTexPcH5Path,
-		std::string strExprMuH5Path,
-		std::string strExprEvH5Path,
-		std::string strExprPcH5Path,
-		std::string strTriangleListH5Path,
 		unsigned int nLandmarks = 0,
 		std::string strLandmarkIdxPath = "");
 
@@ -255,6 +248,7 @@ public:
 	inline double *getMutableExprCoef() { return m_aExprCoef; }
 	inline double *getMutableExtParams() { return m_aExtParams; }
 	inline double *getMutableIntParams() { return m_aIntParams; }
+	inline double& getMutableScale() { return m_scale; }
 	inline const double *getExtParams() const { return m_aExtParams; }
 	inline const double *getIntParams() const { return m_aIntParams; }
 
@@ -314,10 +308,10 @@ public:
 	} 
 	inline const VectorXd &getCurrentExpr() const { return m_vecCurrentExpr; }
 	inline const VectorXd &getCurrentBlendshape() const { return m_vecCurrentBlendshape; }
-	inline const VectorXd getLandmarkCurrentBlendshape() { return m_vecLandmarkCurrentBlendshape; }
+	inline const VectorXd &getLandmarkCurrentBlendshape() const { return m_vecLandmarkCurrentBlendshape; }
 	VectorXd getLandmarkCurrentBlendshapeTransformed() const { return bfm_utils::TransPoints(m_matR, m_vecT, m_vecLandmarkCurrentBlendshape); }
 	VectorXd getCurrentBlendshapeTransformed() const { return bfm_utils::TransPoints(m_matR, m_vecT, m_vecCurrentBlendshape); }
-	inline const Matrix<unsigned int, Dynamic, 1> &getTriangleList() const 	{ return m_vecTriangleList; }
+	inline const Matrix<unsigned short, Dynamic, 1> &getTriangleList() const { return m_vecTriangleList; }
 
 
 /*************************************************************************************************************/
@@ -473,7 +467,7 @@ private:
 		assert(nLength >= 0);
 
 		Matrix<Derived, Dynamic, 1> tmpCoef(nLength);
-		for(int i = 0; i < nLength; i++)
+		for(auto i = 0u; i < nLength; i++)
 			tmpCoef(i) = aCoef[i];
 
 		Matrix<Derived, Dynamic, 1> tmpMu = vecMu.cast<Derived>();
@@ -482,6 +476,8 @@ private:
 		return tmpMu + tmpPc * tmpCoef.cwiseProduct(tmpEv);
 	}
 
+
+	std::string m_strVersion;
 
 	// file path
 	std::string m_strModelPath;
@@ -510,7 +506,8 @@ private:
     // Pitch rotates around x axis 
 	Matrix3d m_matR;
 	Vector3d m_vecT;
-	double m_aExtParams[N_EXT_PARAMS] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};	/* roll yaw pitch tx ty tz */
+	double m_scale = 0.0075;
+	double m_aExtParams[N_EXT_PARAMS] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};	/* roll yaw pitch tx ty tz*/
 	double m_aIntParams[4] = { 0.0, 0.0, 0.0, 0.0 };	/* fx fy cx cy */
 
 	double *m_aShapeCoef;
@@ -529,7 +526,7 @@ private:
 	VectorXd m_vecExprEv;
 	MatrixXd m_matExprPc;
 
-	Matrix<unsigned int, Dynamic, 1> m_vecTriangleList;	
+	Matrix<unsigned short, Dynamic, 1> m_vecTriangleList;	
 
 	VectorXd m_vecCurrentShape;
 	VectorXd m_vecCurrentTex;
