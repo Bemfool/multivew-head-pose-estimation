@@ -69,11 +69,22 @@ public:
 		m_pathRootDir(path(rootDir)),
 		m_pathPhotoDir(m_pathRootDir / "image"),
 		m_pathXml(m_pathRootDir / "cam.xml")
-	{
+	{		
 		
+
 		LOG(INFO) << "Init data manager";
 		this->loadCamInfo();
 		this->loadTextures();
+
+		LOG(INFO) << "Load successfully\n";
+		LOG(INFO) << "********************************************";
+		LOG(INFO) << "************* Load Data ********************";
+		LOG(INFO) << "********************************************";
+		LOG(INFO) << "Camera intrinsic parameters(f cx cy):";
+		LOG(INFO) << "\t" << m_f << "\t" << m_cx << "\t" << m_cy;
+		LOG(INFO) << "Number of view:\t" << m_nViews;
+
+
 	}
 
 	double getF() const { return m_f; }
@@ -81,7 +92,7 @@ public:
 	double getCy() const { return m_cy; }
 	double getWidth() const { return m_width; }
 	double getHeight() const { return m_height; }
-	unsigned int getFaces() const { return m_nFaces; }
+	unsigned int getFaces() const { return m_nViews; }
 
 	const std::vector<Eigen::Matrix<float, 4, 4>>& getCameraMatrices() const {return m_aCameraMatrices; }
 	const std::vector<Eigen::Matrix<float, 3, 4>>& getProjMatrices() const { return m_aProjMatrices; }
@@ -101,7 +112,7 @@ public:
 	double m_cy;
 	double m_width;
 	double m_height;
-	unsigned int m_nFaces;
+	unsigned int m_nViews;
 
 	Eigen::Matrix4f m_matModel;
 	std::vector<Eigen::Matrix<float, 4, 4>> m_aCameraMatrices;
@@ -228,10 +239,10 @@ private:
 			XMLElement *cameras = chunk->FirstChildElement("cameras");
 			if (cameras != NULL)
 			{
-				m_nFaces = atoi(cameras->Attribute("next_id"));
-				cout << "camera nums: " << m_nFaces << endl;
+				m_nViews = atoi(cameras->Attribute("next_id"));
+				cout << "camera nums: " << m_nViews << endl;
 
-				sensor_idxs.resize(m_nFaces);
+				sensor_idxs.resize(m_nViews);
 
 				XMLElement *xml_camera = cameras->FirstChildElement("camera");
 				while (NULL != xml_camera)
@@ -307,8 +318,8 @@ private:
 	Status loadTextures()
 	{
 		LOG(INFO) << "Load textures";
-		m_aTextures.resize(m_nFaces);
-		for (auto iFace = 0; iFace < m_nFaces; iFace++)
+		m_aTextures.resize(m_nViews);
+		for (auto iFace = 0; iFace < m_nViews; iFace++)
 		{
 			path pathTexture = m_pathPhotoDir / (file_utils::Id2Str(iFace) + ".jpg");
 			std::cout << "Load texture: " << pathTexture.string() << std::endl;
