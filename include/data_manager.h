@@ -6,7 +6,11 @@
 #include "texture.h"
 
 #include "tinyxml2.h"
+
+#include "tiny_progress.hpp"
+
 #include <Eigen/Dense>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 
@@ -16,6 +20,7 @@
 #include <string>
 #include <iostream>
 #include <vector>
+#include <iomanip>
 
 using namespace tinyxml2;
 using namespace boost::filesystem;
@@ -70,18 +75,25 @@ public:
 		m_pathPhotoDir(m_pathRootDir / "image"),
 		m_pathXml(m_pathRootDir / "cam.xml")
 	{		
-		
-
 		LOG(INFO) << "Init data manager";
-		this->loadCamInfo();
-		this->loadTextures();
+
+		if(this->loadCamInfo() == Status_Error)
+		{
+			m_nViews = 0;
+			return;
+		}
+
+		if(this->loadTextures() == Status_Error)
+		{
+			m_nViews = 0;
+			return;
+		}
 
 		LOG(INFO) << "Load successfully\n";
 		LOG(INFO) << "********************************************";
 		LOG(INFO) << "************* Load Data ********************";
 		LOG(INFO) << "********************************************";
-		LOG(INFO) << "Camera intrinsic parameters(f cx cy):";
-		LOG(INFO) << "\t" << m_f << "\t" << m_cx << "\t" << m_cy;
+		LOG(INFO) << "Camera intrinsic parameters(f cx cy):\t" << m_f << "\t" << m_cx << "\t" << m_cy;
 		LOG(INFO) << "Number of view:\t" << m_nViews;
 
 
@@ -240,7 +252,6 @@ private:
 			if (cameras != NULL)
 			{
 				m_nViews = atoi(cameras->Attribute("next_id"));
-				cout << "camera nums: " << m_nViews << endl;
 
 				sensor_idxs.resize(m_nViews);
 
@@ -318,14 +329,42 @@ private:
 	Status loadTextures()
 	{
 		LOG(INFO) << "Load textures";
+
+		// int barWidth = 70, curPos;
+		// double proStep = 1.0 / m_nViews, proCurrent = 0.0;
+		// m_aTextures.resize(m_nViews);
+		// for (auto iFace = 0; iFace < m_nViews; iFace++)
+		// {
+		// 	std::cout << "[";	
+		// 	curPos = barWidth * proCurrent;	
+		// 	proCurrent += proStep;
+		// 	for(auto i = 0; i < barWidth; ++i)
+		// 	{
+		// 		if(i < curPos) std::cout << "=";
+		// 		else if(i == curPos) std::cout << ">";
+		// 		else std::cout << " ";
+		// 	}
+		// 	std::cout << "]" << setw(3) << fixed << setprecision(0) << proCurrent * 100 << "% ";
+
+		// 	path pathTexture = m_pathPhotoDir / (file_utils::Id2Str(iFace) + ".jpg");
+
+		// 	std::cout << "Load: " << pathTexture.filename().string() << "\r";
+		// 	std::cout.flush();
+
+		// 	m_aTextures[iFace] = Texture::LoadTexture(pathTexture.string());
+		// }
+		// std::cout << std::endl;
+
 		m_aTextures.resize(m_nViews);
+		tiny_progress::ProgressBar pb(m_nViews);
+		pb.begin(std::ref(std::cout), "Loading.");
 		for (auto iFace = 0; iFace < m_nViews; iFace++)
 		{
 			path pathTexture = m_pathPhotoDir / (file_utils::Id2Str(iFace) + ".jpg");
-			std::cout << "Load texture: " << pathTexture.string() << std::endl;
 			m_aTextures[iFace] = Texture::LoadTexture(pathTexture.string());
+			pb.update(1, "Loading " + pathTexture.filename().string());
 		}
-
+		pb.end(std::ref(std::cout), "Done.");
 		return Status_Ok;
 	}
 };

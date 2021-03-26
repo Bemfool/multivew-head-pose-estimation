@@ -41,7 +41,7 @@ using Summary = ceres::Solver::Summary;
 		ceres::Solver::Summary summary;
 
 
-class HeadPoseEstimationProblem 
+class MHPEProblem
 {
 
 
@@ -58,13 +58,20 @@ public:
 	 * Init a head pose estimation problem with input filename as bfm input filename.
 	 */
 
-	HeadPoseEstimationProblem();
-	BfmStatus init();
-
+	MHPEProblem(
+		const std::string& strProjectPath,
+        const std::string& strBfmH5Path,
+        const std::string& strLandmarkIdxPath
+	);
+	Status init(
+		const std::string& strProjectPath,
+        const std::string& strBfmH5Path,
+        const std::string& strLandmarkIdxPath
+	);
 
 	inline BaselFaceModelManager *getModel() { return m_pModel; }
 
-	void solve();
+	void solve(SolveExtParamsMode mode, const std::string& strDlibDetPath);
 	
 	void estExtParams(double *pPoints, double dScMean);
 	Summary estExtParams(const DetPairVector&  aObjDets);
@@ -82,10 +89,6 @@ public:
 
 
 private:
-
-
-	void dlt();
-
 
 	bool is_close_enough(double *ext_params, double rotation_eps = 0, double translation_eps = 0);
 	

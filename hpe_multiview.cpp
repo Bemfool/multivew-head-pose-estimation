@@ -30,22 +30,20 @@ int main(int argc, char* argv[])
 
     string projectPath, bfmH5Path;
     string landmarkIdxPath, dlibLandmarkDetPath;
-    string shapeMuH5Path, shapeEvH5Path, shapePcH5Path;
-    string exprMuH5Path, exprEvH5Path, exprPcH5Path;
 
     opts.add_options()
         ("project_path", po::value<string>(&projectPath)->default_value(
             R"(/media/keith/SAKURA/face_zzm/project)"), 
-            "Folder containing images and camera information."),
+            "Folder containing images and camera information.")
         ("bfm_h5_path", po::value<string>(&bfmH5Path)->default_value(
             R"(/home/keith/Data/BaselFaceModel_mod.h5)"), 
-            "Path of Basel Face Model."),
+            "Path of Basel Face Model.")
         ("landmark_idx_path", po::value<string>(&landmarkIdxPath)->default_value(
             R"(/home/keith/Project/head-pose-estimation/data/example_landmark_68.anl)"), 
-            "Path of corresponding between dlib and model vertex index."),
+            "Path of corresponding between dlib and model vertex index.")
         ("dlib_landmark_det_path", po::value<string>(&dlibLandmarkDetPath)->default_value(
             R"(/home/keith/Data/shape_predictor_68_face_landmarks.dat)"), 
-            "Path of shape_predictor_68_face_landmarks.dat."),
+            "Path of shape_predictor_68_face_landmarks.dat.")
         ("help,h", "Help message");
     
     try
@@ -65,23 +63,19 @@ int main(int argc, char* argv[])
         return 0;
     }
 
-	HeadPoseEstimationProblem *pHpeProblem = new HeadPoseEstimationProblem();
+    LOG(INFO) << "Check inputs:";
+    LOG(INFO) << "Project path:\t" << projectPath;
+    LOG(INFO) << "Bfm path:\t" << bfmH5Path;
+    LOG(INFO) << "Landmark indices path:\t" << landmarkIdxPath;
+    LOG(INFO) << "Dlib landmark detector path:\t" << dlibLandmarkDetPath;
+    LOG(INFO) << "\n";
+
+	MHPEProblem *pHpeProblem = new MHPEProblem(projectPath, bfmH5Path, landmarkIdxPath);
 	BaselFaceModelManager *pBfmManager = pHpeProblem->getModel();
 
-    /****************** TEST ***********************/
-    // pBfmManager->genAvgFace();
-    // pBfmManager->writePly("testAvg.ply", ModelWriteMode_CameraCoord);
-    // pBfmManager->setRoll(3.14);
-    // pBfmManager->writePly("testRot.ply", ModelWriteMode_CameraCoord);
-    // return 0;
-    /***********************************************/
-
-    // Start of solving 
-    auto start = std::chrono::system_clock::now();
-    pHpeProblem->solve();
-    
-    // End of solving
-    auto end = std::chrono::system_clock::now();
+    auto start = std::chrono::system_clock::now();    // Start of solving 
+    pHpeProblem->solve(SolveExtParamsMode_Default, dlibLandmarkDetPath);
+    auto end = std::chrono::system_clock::now();    // End of solving
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     LOG(INFO) << "Cost of solution: "
         << (double(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den)

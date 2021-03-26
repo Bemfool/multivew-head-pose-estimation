@@ -1,9 +1,9 @@
-# Head Pose Estimation & Tracking - C++
+# Multiview Head Pose Estimation & Tracking - C++
 
-Estimate (from one image) and track (from video stream) head pose using C++.
+Estimate head pose from multiple views using C++.
+(Extrinsic parameters of cameras are predicted as known)
 
 Fit 2d landmarks got from Dlib and 3d landmarks got from Basel face model.
-
 
 
 ## Dependence
@@ -18,18 +18,11 @@ Fit 2d landmarks got from Dlib and 3d landmarks got from Basel face model.
 
 | File/Directory Name    | Usage                                                        |
 | ---------------------- | ------------------------------------------------------------ |
-| hpe_oneshot.cpp        | Source file of head pose estimation from one image, only depending on Dlib. |
-| hpe_oneshot_openGL.cpp | Source file of head pose estimation from one image, using OpenGL framework. |
-| hpe_webcam.cpp         | Source file of head pose tracking from video stream, only depending on Dlib. Use multi-step optimization strategy. |
-| hpe_webcam_openGL.cpp  | Source file of head pose tracking from video stream, using OpenGL framework. Use multi-step optimization strategy. |
-| time_recorder.cpp      | Source file of counting cost time of different implementations. |
-| hmr_gen_data.cpp       | Source file of generating synthetic data for head motion recognition. |
-| batch_hpe_videos.sh    | Bash script for batching process videos.                     |
+| ex_mhpe.cpp            | Source file of head pose estimation from one image, only depending on Dlib. |
 | example_inputs         | Contains some examples inputs. Format see also https://github.com/Great-Keith/BFM-tools |
 | data                   | Contains `shape_predictor_68_face_landmarks.dat`, landmark index file (*.anl) and Basel face model (\*.h5). Download by yourself. |
 | include                | Contains header files of head pose estimation.               |
 | lib                    | Contains third-party library (BFM-tools).                    |
-| shader                 | Contains vertex shader and fragment shader used by OpenGL framework. |
 
 
 

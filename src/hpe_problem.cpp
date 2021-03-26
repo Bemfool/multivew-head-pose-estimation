@@ -1,15 +1,29 @@
 #include "hpe_problem.h"
 
-HeadPoseEstimationProblem::HeadPoseEstimationProblem() 
+MHPEProblem::MHPEProblem(
+	const std::string& strProjectPath,
+	const std::string& strBfmH5Path,
+	const std::string& strLandmarkIdxPath
+) 
 {
-	init();
+	if(this->init(strProjectPath, strBfmH5Path, strLandmarkIdxPath) == Status_Error)
+		LOG(ERROR) << "Multi-view head pose estimation problem structure init failed.";
 }
 
-BfmStatus HeadPoseEstimationProblem::init() 
+Status MHPEProblem::init(
+	const std::string& strProjectPath,
+	const std::string& strBfmH5Path,
+	const std::string& strLandmarkIdxPath
+) 
 {
 	LOG(INFO) << "Init problem structure of multiple head pose estimation.";
 
-	m_pDataManager = new DataManager(PROJECT_PATH);
+	m_pDataManager = new DataManager(strProjectPath);
+	if(m_pDataManager->getFaces() == 0)
+	{
+		LOG(ERROR) << "Load data manager failed.";
+		return Status_Error;
+	}
 
 	double aIntParams[4];
 	aIntParams[0] = aIntParams[1] = m_pDataManager->getF() * ZOOM_SCALE;
@@ -17,76 +31,23 @@ BfmStatus HeadPoseEstimationProblem::init()
 	aIntParams[3] = (m_pDataManager->getHeight() * 0.5 + m_pDataManager->getCy()) * ZOOM_SCALE;
 	
 	m_pModel = new BaselFaceModelManager(
-		BFM_H5_PATH,
+		strBfmH5Path,
 		aIntParams,
-		N_LANDMARKS,
-		LANDMARK_IDX_PATH
+		strLandmarkIdxPath
 	);
-
-	return BfmStatus_Ok;
-}
-
-
-void HeadPoseEstimationProblem::dlt()
-{
-	BFM_DEBUG("Calculating extrinsic parameters using Direct Linear Transform.\n");
-	unsigned int nLandmarks = m_pModel->getNLandmarks();
-	assert(nLandmarks >= 6);
-
-	cv::Ptr<CvMat> matL;
-	double* L;
-	double LL[12 * 12], LW[12], LV[12 * 12];
-	CvMat _LL = cvMat(12, 12, CV_64F, LL);
-	CvMat _LW = cvMat(12, 1, CV_64F, LW);
-	CvMat _LV = cvMat(12, 12, CV_64F, LV);
-	CvMat _RRt, _RR, _tt;
-
-	matL.reset(cvCreateMat(2 * nLandmarks, 12, CV_64F));
-	L = matL->data.db;
-	const VectorXd &vecLandmarkBlendshape = m_pModel->getLandmarkCurrentBlendshape();
-
-	const double fx = m_pModel->getFx();
-	const double fy = m_pModel->getFy();
-	const double cx = m_pModel->getCx();
-	const double cy = m_pModel->getCy();
-
-	for(int i = 0; i < N_LANDMARKS; i++, L += 24)
+	if(m_pModel->getStrModelPath() == "")
 	{
-		double x = m_pObservedPoints->part(i).x(), y = m_pObservedPoints->part(i).y();
-		double X = vecLandmarkBlendshape(i * 3);
-		double Y = vecLandmarkBlendshape(i * 3 + 1);
-		double Z = vecLandmarkBlendshape(i * 3 + 2);
-		L[0] = X * fx; L[16] = X * fy;
-		L[1] = Y * fx; L[17] = Y * fy;
-		L[2] = Z * fx; L[18] = Z * fy;
-		L[3] = fx; L[19] = fy;
-		L[4] = L[5] = L[6] = L[7] = 0.;
-		L[12] = L[13] = L[14] = L[15] = 0.;
-		L[8] = X * cx - x * X;
-		L[9] = Y * cx - x * Y;
-		L[10] = Z * cx - x * Z;
-		L[11] = cx - x;
-		L[20] = X * cy - y * X;
-		L[21] = Y * cy - y * Y;
-		L[22] = Z * cy - y * Z;
-		L[23] = cy - y;
+		LOG(ERROR) << "Load BFM failed.";
+		return Status_Error;
 	}
 
-	cvMulTransposed(matL, &_LL, 1);
-	cvSVD(&_LL, &_LW, 0, &_LV, CV_SVD_MODIFY_A + CV_SVD_V_T);
-	_RRt = cvMat(3, 4, CV_64F, LV + 11 * 12);
-	cvGetCols(&_RRt, &_RR, 0, 3);
-	cvGetCol(&_RRt, &_tt, 3);
-
-	m_pModel->setMatR(&_RR);
-	m_pModel->setVecT(&_tt);
-	m_pModel->genExtParams();
-
+	return Status_Ok;
 }
 
 
-void HeadPoseEstimationProblem::solve()
+void MHPEProblem::solve(SolveExtParamsMode mode, const std::string& strDlibDetPath)
 {
+	LOG(INFO) << "Begin solving multi-view head pose estimation.";
 
 	std::vector<dlib::array2d<dlib::rgb_pixel>> aArr2dImg(N_PHOTOS), aArr2dTransImg(N_PHOTOS);
 	const std::vector<Texture>& aTextures = m_pDataManager->getTextures();
@@ -104,10 +65,10 @@ void HeadPoseEstimationProblem::solve()
 
 	dlib::frontal_face_detector detector = dlib::get_frontal_face_detector();
 	dlib::shape_predictor sp;
-	dlib::deserialize(DLIB_LANDMARK_DETECTOR_DATA_PATH) >> sp;
-	BFM_DEBUG(PRINT_YELLOW "\n[Step 0] Detector init successfully\n" COLOR_END);
-	BFM_DEBUG(PRINT_YELLOW "\n[Input] %d Images (Id from %d to %d)\n" COLOR_END, END - START, START, END - 1);
-	BFM_DEBUG(PRINT_YELLOW "\n[Step 1] Remove outliers\n" COLOR_END);
+	dlib::deserialize(strDlibDetPath) >> sp;
+	LOG(INFO) << "[Step 0] Detector init successfully";
+	LOG(INFO) << "\t[Input] " <<  END - START << "Images (Id from " << START << " to " << END - 1 << ".";
+	LOG(INFO) << "[Step 1] Remove outliers";
 	for(auto i = START; i < END; i++)
 	{
 		if(pRotateList[i] == RotateType_Invalid)
@@ -166,7 +127,7 @@ void HeadPoseEstimationProblem::solve()
 	}
 
 
-	BFM_DEBUG(PRINT_YELLOW "\n[Step 3] Combine available photos and estimate.\n" COLOR_END);
+	LOG(INFO) << "[Step 3] Combine available photos and estimate.";
 	
 	dlib::image_window winOrigin[END], winTrans[END];
 	for(auto i = 0u; i < START; i++) 
@@ -174,6 +135,8 @@ void HeadPoseEstimationProblem::solve()
 		winOrigin[i].close_window();
 		winTrans[i].close_window();
 	}
+
+	
 	for(unsigned int i = START; i < END; i++)
 	{
 		if(pRotateList[i] == RotateType_Invalid)
@@ -195,10 +158,13 @@ void HeadPoseEstimationProblem::solve()
 		aObjDets.push_back(std::pair<dlib::full_object_detection, int>(aTransDetRecs[i], i));
 	}
 
-	std::cout << "Final picked photos include: \n   " << std::endl;
-	for(auto itPhoto = aObjDets.cbegin(); itPhoto != aObjDets.cend(); itPhoto++)
-		std::cout << " " << itPhoto->second;
-	std::cout << std::endl;
+	{
+		auto&& log = COMPACT_GOOGLE_LOG_INFO;
+		LOG(INFO) << "Final picked photos include:";
+		for(auto itPhoto = aObjDets.cbegin(); itPhoto != aObjDets.cend(); itPhoto++)
+			log.stream() << " " << itPhoto->second;
+		log.stream() << "\n";
+	}
 
 	ceres::Problem problem;	
 	ceres::CostFunction *costFunction;
@@ -246,30 +212,7 @@ void HeadPoseEstimationProblem::solve()
 	dis2 = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2) + (z1 - z2) * (z1 - z2);
 	scVer = sqrt(dis1) / sqrt(dis2);	
 	initSc = (scHor + scVer) * 0.5;
-	std::cout << "Estimate scale: " << scHor << " " << scVer << " -> " << initSc << std::endl;
-
-	// std::ofstream out;
-	// out.open("intial_landmarks.ply", std::ios::out | std::ios::binary);
-	// out << "ply\n";
-	// out << "format binary_little_endian 1.0\n";
-	// out << "comment Made from the 3D Morphable Face Model of the Univeristy of Basel, Switzerland.\n";
-	// out << "element vertex " << 68 << "\n";
-	// out << "property float x\n";
-	// out << "property float y\n";
-	// out << "property float z\n";
-	// out << "end_header\n";
-
-	// for (int i = 0; i < 68; i++) 
-	// {
-	// 	float x, y, z;
-	// 	x = float(points[i * 3]);
-	// 	y = float(points[i * 3 + 1]);
-	// 	z = float(points[i * 3 + 2]);
-	// 	out.write((char *)&x, sizeof(x));
-	// 	out.write((char *)&y, sizeof(y));
-	// 	out.write((char *)&z, sizeof(z));
-	// }
-	// out.close();	
+	LOG(INFO) << "Estimate scale: " << scHor << " " << scVer << " -> " << initSc;
 
 	this->estExtParams(points, initSc);
 	bool isConvergence;
@@ -344,7 +287,7 @@ void HeadPoseEstimationProblem::solve()
 }
 
 
-void HeadPoseEstimationProblem::estExtParams(double *pPoints, double dScMean)
+void MHPEProblem::estExtParams(double *pPoints, double dScMean)
 {
 	LOG(INFO) << "Estimate Multi-Faces Extrinsic Parameters (Initial)" << std::endl;
 
@@ -366,7 +309,7 @@ void HeadPoseEstimationProblem::estExtParams(double *pPoints, double dScMean)
 }
 
 
-Summary HeadPoseEstimationProblem::estExtParams(const DetPairVector& aObjDets)
+Summary MHPEProblem::estExtParams(const DetPairVector& aObjDets)
 {
 	LOG(INFO) << "Estimate Multi-Faces Extrinsic Parameters" << std::endl;
 
@@ -391,7 +334,7 @@ Summary HeadPoseEstimationProblem::estExtParams(const DetPairVector& aObjDets)
 	return summary;
 }
 
-Summary HeadPoseEstimationProblem::estShapeCoef(const DetPairVector& aObjDets) 
+Summary MHPEProblem::estShapeCoef(const DetPairVector& aObjDets) 
 {
 	LOG(INFO) << "Estimate Multi-Faces Shape Coefficients" << std::endl;
 
@@ -415,7 +358,7 @@ Summary HeadPoseEstimationProblem::estShapeCoef(const DetPairVector& aObjDets)
 }
 
 
-Summary HeadPoseEstimationProblem::estExprCoef(const DetPairVector& aObjDets) 
+Summary MHPEProblem::estExprCoef(const DetPairVector& aObjDets) 
 {
 	LOG(INFO) << "Estimate Multi-Faces Expression Coefficients" << std::endl;
 
@@ -439,7 +382,7 @@ Summary HeadPoseEstimationProblem::estExprCoef(const DetPairVector& aObjDets)
 }
 
 
-bool HeadPoseEstimationProblem::solveExtParams(long mode, double ca, double cb) 
+bool MHPEProblem::solveExtParams(long mode, double ca, double cb) 
 {
 	BFM_DEBUG(PRINT_GREEN "#################### Estimate Extrinsic Parameters ####################\n" COLOR_END);
 	if(mode & SolveExtParamsMode_UseOpenCV)
@@ -483,7 +426,7 @@ bool HeadPoseEstimationProblem::solveExtParams(long mode, double ca, double cb)
 		if(mode & SolveExtParamsMode_UseDlt)
 		{
 			BFM_DEBUG("	1) estimate initial values by using DLT algorithm.\n");
-			dlt();
+			// dlt();
 		}
 		else
 		{
@@ -531,7 +474,7 @@ bool HeadPoseEstimationProblem::solveExtParams(long mode, double ca, double cb)
 		if(mode & SolveExtParamsMode_UseDlt)
 		{
 			std::cout << "	1) esitimate initial values by using DLT algorithm." << std::endl;
-			dlt();
+			// dlt();
 		}
 		else
 		{
@@ -563,7 +506,7 @@ bool HeadPoseEstimationProblem::solveExtParams(long mode, double ca, double cb)
 }
 
 
-bool HeadPoseEstimationProblem::solveShapeCoef() {
+bool MHPEProblem::solveShapeCoef() {
 	BFM_DEBUG(PRINT_GREEN "#################### Estimate Shape Coefficients ####################\n" COLOR_END);
 	ceres::Problem problem;
 	double *aShapeCoef = m_pModel->getMutableShapeCoef();
@@ -581,7 +524,7 @@ bool HeadPoseEstimationProblem::solveShapeCoef() {
 }
 
 
-bool HeadPoseEstimationProblem::solveExprCoef() {
+bool MHPEProblem::solveExprCoef() {
 	BFM_DEBUG(PRINT_GREEN "#################### Estimate Expression Coefficients ####################\n" COLOR_END);
 	ceres::Problem problem;
 	double *aExprCoef = m_pModel->getMutableExprCoef();
@@ -599,7 +542,7 @@ bool HeadPoseEstimationProblem::solveExprCoef() {
 }
 
 
-bool HeadPoseEstimationProblem::is_close_enough(double *ext_params, double rotation_eps, double translation_eps)
+bool MHPEProblem::is_close_enough(double *ext_params, double rotation_eps, double translation_eps)
 {
 	for(int i=0; i<3; i++)
 		if(abs(ext_params[i]) > rotation_eps)

@@ -16,10 +16,6 @@ enum RotateType
 	RotateType_CCW,
 };
 
-const std::string PROJECT_PATH = R"(/media/keith/SAKURA/face_zzm/project)";
-const std::string BFM_H5_PATH = R"(/home/keith/Data/BaselFaceModel_mod.h5)";
-const std::string LANDMARK_IDX_PATH = R"(/home/keith/Project/head-pose-estimation/data/example_landmark_68.anl)";
-const std::string DLIB_LANDMARK_DETECTOR_DATA_PATH = R"(/home/keith/Data/shape_predictor_68_face_landmarks.dat)";
 const std::string LOG_PATH = R"(./log)";
 
 const unsigned int N_PHOTOS = 24u;
@@ -50,6 +46,7 @@ enum SolveExtParamsMode
 	SolveExtParamsMode_UseOpenCV = 1L << 1,
 	SolveExtParamsMode_UseLinearizedRadians = 1L << 2,
 	SolveExtParamsMode_UseDlt = 1L << 3,
+	SolveExtParamsMode_Default = 1L << 4,
 };
 
 
