@@ -8,7 +8,7 @@
 
 class ShapeCoefRegTerm {
 public:                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
-	ShapeCoefRegTerm(BaselFaceModelManager *pModel) : m_pModel(pModel) {}
+	ShapeCoefRegTerm(BfmManager *pModel) : m_pModel(pModel) {}
     template<typename _Tp>
 	bool operator () (_Tp const* const* aParams, _Tp* aResiduals) const {
 		const _Tp* aShapeCoefs = aParams[0]; 
@@ -18,19 +18,19 @@ public:
 		return true;
 	}
 
-	static ceres::DynamicAutoDiffCostFunction<ShapeCoefRegTerm> *create(BaselFaceModelManager *pModel) {
+	static ceres::DynamicAutoDiffCostFunction<ShapeCoefRegTerm> *create(BfmManager *pModel) {
 		return (new ceres::DynamicAutoDiffCostFunction<ShapeCoefRegTerm>(new ShapeCoefRegTerm(pModel)));
 	}
 
 private:
 	const double m_dWeight = 0.003;
-	BaselFaceModelManager *m_pModel;
+	BfmManager *m_pModel;
 };
 
 
 class ExprCoefRegTerm {
 public:                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
-	ExprCoefRegTerm(BaselFaceModelManager *pModel) : m_pModel(pModel) {}
+	ExprCoefRegTerm(BfmManager *pModel) : m_pModel(pModel) {}
     template<typename _Tp>
 	bool operator () (_Tp const* const* aParams, _Tp* aResiduals) const {
 		const _Tp* aExprCoefs = aParams[0];
@@ -40,13 +40,13 @@ public:
 		return true;
 	}
 
-	static ceres::DynamicAutoDiffCostFunction<ExprCoefRegTerm> *create(BaselFaceModelManager *pModel) {
+	static ceres::DynamicAutoDiffCostFunction<ExprCoefRegTerm> *create(BfmManager *pModel) {
 		return (new ceres::DynamicAutoDiffCostFunction<ExprCoefRegTerm>(new ExprCoefRegTerm(pModel)));
 	}
 
 private:
 	const double m_dWeight = 0.01;
-	BaselFaceModelManager *m_pModel;
+	BfmManager *m_pModel;
 };
 
 

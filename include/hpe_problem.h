@@ -16,6 +16,8 @@
 
 #include "ceres/ceres.h"
 
+#include "tiny_progress.hpp"
+
 #include "glog/logging.h"
 
 #include "string_utils.h"
@@ -69,7 +71,7 @@ public:
         const std::string& strLandmarkIdxPath
 	);
 
-	inline BaselFaceModelManager *getModel() { return m_pModel; }
+	inline BfmManager *getModel() { return m_pBfmManager; }
 
 	void solve(SolveExtParamsMode mode, const std::string& strDlibDetPath);
 	
@@ -94,7 +96,7 @@ private:
 	
 	std::vector<std::pair<FullObjectDetection, int>> m_aObjDetections;
 	FullObjectDetection* m_pObservedPoints;
-	BaselFaceModelManager *m_pModel;
+	BfmManager *m_pBfmManager;
 	DataManager* m_pDataManager;
 	std::vector<unsigned int> m_aLandmarkMap;
 

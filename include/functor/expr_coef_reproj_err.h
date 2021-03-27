@@ -16,7 +16,7 @@ class MultiExprCoefReprojErr {
 public:                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
 	MultiExprCoefReprojErr(
 		const DetPairVector &aObjDetections, 
-		BaselFaceModelManager *model, 
+		BfmManager *model, 
 		DataManager* pDataManager) : 
 		m_aObjDetections(aObjDetections), 
 		m_pModel(model), 
@@ -41,7 +41,7 @@ public:
 		const auto& aMatCams = m_pDataManager->getCameraMatrices();
 
 		// Fetch extrinsic parameters and scale
-		const double* pdExtParams = m_pModel->getExtParams();
+		const double* pdExtParams = m_pModel->getExtParams().data();
 		pExtParams = new _Tp[N_EXT_PARAMS];
 		for(auto i = 0u; i < N_EXT_PARAMS; i++) 
 			pExtParams[i] = static_cast<_Tp>(pdExtParams[i]);
@@ -84,7 +84,7 @@ public:
 
 	static CostFunction *create(
 		const DetPairVector &aObjDetections, 
-		BaselFaceModelManager* model, 
+		BfmManager* model, 
 		DataManager* pDataManager) 
 	{
 		return (new AutoDiffCostFunction<MultiExprCoefReprojErr, N_RES + N_EXPR_PCS, N_EXPR_PCS>(
@@ -93,7 +93,7 @@ public:
 
 private:
 	DetPairVector m_aObjDetections;
-    BaselFaceModelManager *m_pModel;
+    BfmManager *m_pModel;
 	DataManager* m_pDataManager;
 	double* m_pExtParams;
 	double m_dWeight = 0.001;
@@ -102,7 +102,7 @@ private:
 
 class ExprCoefReprojErr {
 public:                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
-	ExprCoefReprojErr(FullObjectDetection *observedPoints, BaselFaceModelManager *model, std::vector<unsigned int> &aLandmarkMap) 
+	ExprCoefReprojErr(FullObjectDetection *observedPoints, BfmManager *model, std::vector<unsigned int> &aLandmarkMap) 
 	: m_pObservedPoints(observedPoints), m_pModel(model), m_aLandmarkMap(aLandmarkMap) { }
 	
     template<typename _Tp>
@@ -112,7 +112,7 @@ public:
 
 		const Matrix<_Tp, Dynamic, 1> vecLandmarkBlendshape = m_pModel->genLandmarkBlendshapeByExpr(aExprCoef);  
 
-		const double *daExtParams = m_pModel->getExtParams();
+		const double *daExtParams = m_pModel->getExtParams().data();
         _Tp *taExtParams = new _Tp[N_EXT_PARAMS];
         for(unsigned int iParam = 0; iParam < N_EXT_PARAMS; iParam++)
             taExtParams[iParam] = (_Tp)(daExtParams[iParam]);
@@ -131,14 +131,14 @@ public:
 		return true;
 	}
 
-	static ceres::CostFunction *create(FullObjectDetection *observedPoints, BaselFaceModelManager *model, std::vector<unsigned int> aLandmarkMap) {
+	static ceres::CostFunction *create(FullObjectDetection *observedPoints, BfmManager *model, std::vector<unsigned int> aLandmarkMap) {
 		return (new ceres::AutoDiffCostFunction<ExprCoefReprojErr, N_LANDMARKS * 2, N_EXPR_PCS>(
 			new ExprCoefReprojErr(observedPoints, model, aLandmarkMap)));
 	}
 
 private:
 	FullObjectDetection *m_pObservedPoints;
-	BaselFaceModelManager *m_pModel;
+	BfmManager *m_pModel;
 	std::vector<unsigned int> m_aLandmarkMap;
 };
 

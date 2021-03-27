@@ -25,21 +25,22 @@ Status MHPEProblem::init(
 		return Status_Error;
 	}
 
-	double aIntParams[4];
+	std::array<double, N_INT_PARAMS> aIntParams = { };
 	aIntParams[0] = aIntParams[1] = m_pDataManager->getF() * ZOOM_SCALE;
 	aIntParams[2] = (m_pDataManager->getWidth() * 0.5 + m_pDataManager->getCx()) * ZOOM_SCALE;
 	aIntParams[3] = (m_pDataManager->getHeight() * 0.5 + m_pDataManager->getCy()) * ZOOM_SCALE;
 	
-	m_pModel = new BaselFaceModelManager(
+	m_pBfmManager = new BfmManager(
 		strBfmH5Path,
 		aIntParams,
 		strLandmarkIdxPath
 	);
-	if(m_pModel->getStrModelPath() == "")
+	if(m_pBfmManager->getStrModelPath() == "")
 	{
 		LOG(ERROR) << "Load BFM failed.";
 		return Status_Error;
 	}
+	m_pBfmManager->check();
 
 	return Status_Ok;
 }
@@ -163,13 +164,13 @@ void MHPEProblem::solve(SolveExtParamsMode mode, const std::string& strDlibDetPa
 		LOG(INFO) << "Final picked photos include:";
 		for(auto itPhoto = aObjDets.cbegin(); itPhoto != aObjDets.cend(); itPhoto++)
 			log.stream() << " " << itPhoto->second;
-		log.stream() << "\n";
+		log.stream() << "\n";            
 	}
 
 	ceres::Problem problem;	
 	ceres::CostFunction *costFunction;
 	CERES_INIT(N_CERES_ITERATIONS, N_CERES_THREADS, B_CERES_STDCOUT);
-	costFunction = PointReprojErr::create(aObjDets, m_pModel, m_pDataManager);
+	costFunction = PointReprojErr::create(aObjDets, m_pBfmManager, m_pDataManager);
 	double *points = new double[204];
 	std::fill(points, points + 204, 0.0);
 	problem.AddResidualBlock(costFunction, nullptr, points);
@@ -180,7 +181,7 @@ void MHPEProblem::solve(SolveExtParamsMode mode, const std::string& strDlibDetPa
 	double x1, y1, z1, x2, y2, z2;
 	double dis1, dis2;
 	double scHor, scVer, initSc;
-	auto& modelPoints = m_pModel->getLandmarkCurrentBlendshape();
+	auto& modelPoints = m_pBfmManager->getLandmarkCurrentBlendshape();
 	x1 = points[idxPairHor[0] * 3];
 	y1 = points[idxPairHor[0] * 3 + 1];
 	z1 = points[idxPairHor[0] * 3 + 2];
@@ -230,9 +231,9 @@ void MHPEProblem::solve(SolveExtParamsMode mode, const std::string& strDlibDetPa
 
 	BFM_DEBUG(PRINT_YELLOW "\n[Step 4] Show results.\n" COLOR_END);
 	float pfExtParams[N_EXT_PARAMS];
-	for(auto i = 0u; i < N_EXT_PARAMS; ++i) pfExtParams[i] = (float)m_pModel->getMutableExtParams()[i];
-	Eigen::VectorXf vecPts = m_pModel->getLandmarkCurrentBlendshape().template cast<float>() * (float)m_pModel->getMutableScale();
-	// Eigen::VectorXf vecPts = m_pModel->getLandmarkCurrentBlendshape().template cast<float>();
+	for(auto i = 0u; i < N_EXT_PARAMS; ++i) pfExtParams[i] = (float)m_pBfmManager->getMutableExtParams()[i];
+	Eigen::VectorXf vecPts = m_pBfmManager->getLandmarkCurrentBlendshape().template cast<float>() * (float)m_pBfmManager->getMutableScale();
+	// Eigen::VectorXf vecPts = m_pBfmManager->getLandmarkCurrentBlendshape().template cast<float>();
 	for(auto i = START; i < END; i++)
 	{	
 		if(pRotateList[i] == RotateType_Invalid) continue;
@@ -244,8 +245,8 @@ void MHPEProblem::solve(SolveExtParamsMode mode, const std::string& strDlibDetPa
 		std::vector<dlib::point> aPoints;
 		for(unsigned int iLandmark = 0; iLandmark < N_LANDMARKS; iLandmark++) 
 		{
-			int u = int(m_pModel->getFx() * vecTranPts1(iLandmark * 3) / vecTranPts1(iLandmark * 3 + 2) + m_pModel->getCx());
-			int v = int(m_pModel->getFy() * vecTranPts1(iLandmark * 3 + 1) / vecTranPts1(iLandmark * 3 + 2) + m_pModel->getCy());
+			int u = int(m_pBfmManager->getFx() * vecTranPts1(iLandmark * 3) / vecTranPts1(iLandmark * 3 + 2) + m_pBfmManager->getCx());
+			int v = int(m_pBfmManager->getFy() * vecTranPts1(iLandmark * 3 + 1) / vecTranPts1(iLandmark * 3 + 2) + m_pBfmManager->getCy());
 			aPoints.push_back(dlib::point(u, v));
 			// std::cout << u << " " << v << std::endl;
 		}
@@ -268,8 +269,8 @@ void MHPEProblem::solve(SolveExtParamsMode mode, const std::string& strDlibDetPa
 		std::vector<dlib::point> aPoints;
 		for(unsigned int iLandmark = 0; iLandmark < N_LANDMARKS; iLandmark++) 
 		{
-			int u = int(m_pModel->getFx() * vecTranPts1(iLandmark * 3) / vecTranPts1(iLandmark * 3 + 2) + m_pModel->getCx());
-			int v = int(m_pModel->getFy() * vecTranPts1(iLandmark * 3 + 1) / vecTranPts1(iLandmark * 3 + 2) + m_pModel->getCy());
+			int u = int(m_pBfmManager->getFx() * vecTranPts1(iLandmark * 3) / vecTranPts1(iLandmark * 3 + 2) + m_pBfmManager->getCx());
+			int v = int(m_pBfmManager->getFy() * vecTranPts1(iLandmark * 3 + 1) / vecTranPts1(iLandmark * 3 + 2) + m_pBfmManager->getCy());
 			aPoints.push_back(dlib::point(u, v));
 			// std::cout << u << " " << v << std::endl;
 		}
@@ -277,9 +278,9 @@ void MHPEProblem::solve(SolveExtParamsMode mode, const std::string& strDlibDetPa
 	}
 
 
-	m_pModel->genFace();
-	m_pModel->writePly("face_ext_shape.ply", ModelWriteMode_CameraCoord);
-	// m_pModel->writePly("avg.ply");
+	m_pBfmManager->genFace();
+	m_pBfmManager->writePly("face_ext_shape.ply", ModelWriteMode_CameraCoord);
+	// m_pBfmManager->writePly("avg.ply");
 
 	aObjDets.clear();
 	delete[] pRotateList;
@@ -291,13 +292,13 @@ void MHPEProblem::estExtParams(double *pPoints, double dScMean)
 {
 	LOG(INFO) << "Estimate Multi-Faces Extrinsic Parameters (Initial)" << std::endl;
 
-	double& dScale = this->m_pModel->getMutableScale();
+	double& dScale = this->m_pBfmManager->getMutableScale();
 	double *pExtParams;
 	ceres::Problem problem;	
 	ceres::CostFunction *costFunction;
 	CERES_INIT(N_CERES_ITERATIONS, N_CERES_THREADS, B_CERES_STDCOUT);
-	pExtParams = this->m_pModel->getMutableExtParams();
-	costFunction = MultiExtParams3D3DReprojErr::create(pPoints, dScMean, m_pModel, m_pDataManager);
+	pExtParams = this->m_pBfmManager->getMutableExtParams().data();
+	costFunction = MultiExtParams3D3DReprojErr::create(pPoints, dScMean, m_pBfmManager, m_pDataManager);
 	problem.AddResidualBlock(costFunction, nullptr, pExtParams);
 	ceres::Solve(options, &problem, &summary);
 	
@@ -305,7 +306,7 @@ void MHPEProblem::estExtParams(double *pPoints, double dScMean)
 	LOG(INFO) << "Scale: " << dScale << std::endl;
 	
 	// Sync result
-	m_pModel->genTransMat();	
+	m_pBfmManager->genTransMat();	
 }
 
 
@@ -313,15 +314,15 @@ Summary MHPEProblem::estExtParams(const DetPairVector& aObjDets)
 {
 	LOG(INFO) << "Estimate Multi-Faces Extrinsic Parameters" << std::endl;
 
-	double& dScale = this->m_pModel->getMutableScale();
+	double& dScale = this->m_pBfmManager->getMutableScale();
 	double *pExtParams;
 	ceres::Problem problem;	
 	ceres::CostFunction *costFunction;
 	CERES_INIT(N_CERES_ITERATIONS, N_CERES_THREADS, B_CERES_STDCOUT);
 	
-	pExtParams = this->m_pModel->getMutableExtParams();
+	pExtParams = this->m_pBfmManager->getMutableExtParams().data();
 	
-	costFunction = MultiExtParamsReprojErr::create(aObjDets, m_pModel, m_pDataManager);
+	costFunction = MultiExtParamsReprojErr::create(aObjDets, m_pBfmManager, m_pDataManager);
 	problem.AddResidualBlock(costFunction, nullptr, pExtParams, &dScale);
 	ceres::Solve(options, &problem, &summary);
 	
@@ -329,7 +330,7 @@ Summary MHPEProblem::estExtParams(const DetPairVector& aObjDets)
 	LOG(INFO) << "Scale: " << dScale << std::endl;
 	
 	// Sync result
-	m_pModel->genTransMat();
+	m_pBfmManager->genTransMat();
 	
 	return summary;
 }
@@ -343,16 +344,16 @@ Summary MHPEProblem::estShapeCoef(const DetPairVector& aObjDets)
 	ceres::CostFunction *costFunction;
 	CERES_INIT(N_CERES_ITERATIONS, N_CERES_THREADS, B_CERES_STDCOUT);
 
-	pShapeCoef = m_pModel->getMutableShapeCoef();
+	pShapeCoef = m_pBfmManager->getMutableShapeCoef();
 	
-	costFunction = MultiShapeCoefReprojErr::create(aObjDets, m_pModel, m_pDataManager);
+	costFunction = MultiShapeCoefReprojErr::create(aObjDets, m_pBfmManager, m_pDataManager);
 	problem.AddResidualBlock(costFunction, nullptr, pShapeCoef);
 	ceres::Solve(options, &problem, &summary);
 
 	LOG(INFO) << summary.BriefReport() << std::endl;
  
 	// Sync	result
-	m_pModel->genLandmarkBlendshape();
+	m_pBfmManager->genLandmarkBlendshape();
 
 	return summary;
 }
@@ -367,16 +368,16 @@ Summary MHPEProblem::estExprCoef(const DetPairVector& aObjDets)
 	ceres::CostFunction *costFunction;
 	CERES_INIT(N_CERES_ITERATIONS, N_CERES_THREADS, B_CERES_STDCOUT);
 	
-	pExprCoef = m_pModel->getMutableExprCoef();
+	pExprCoef = m_pBfmManager->getMutableExprCoef();
 
-	costFunction = MultiExprCoefReprojErr::create(aObjDets, m_pModel, m_pDataManager);
+	costFunction = MultiExprCoefReprojErr::create(aObjDets, m_pBfmManager, m_pDataManager);
 	problem.AddResidualBlock(costFunction, nullptr, pExprCoef);
 	ceres::Solve(options, &problem, &summary);
 
 	LOG(INFO) << summary.BriefReport() << std::endl;
 
 	// Sync	result
-	m_pModel->genLandmarkBlendshape();
+	m_pBfmManager->genLandmarkBlendshape();
 
 	return summary;
 }
@@ -387,7 +388,7 @@ bool MHPEProblem::solveExtParams(long mode, double ca, double cb)
 	BFM_DEBUG(PRINT_GREEN "#################### Estimate Extrinsic Parameters ####################\n" COLOR_END);
 	if(mode & SolveExtParamsMode_UseOpenCV)
 	{
-		const double *aIntParams = m_pModel->getIntParams();
+		const double *aIntParams = m_pBfmManager->getIntParams().data();
 		double aCameraMatrix[3][3] = {
 			{aIntParams[0], 0.0, aIntParams[2]},
 			{0.0, aIntParams[1], aIntParams[3]},
@@ -401,7 +402,7 @@ bool MHPEProblem::solveExtParams(long mode, double ca, double cb)
 		std::vector<cv::Point3f> out;
 		std::vector<cv::Point2f> in;
 		cv::Mat rvec, tvec;
-		const VectorXd& vecLandmarkBlendshape = m_pModel->getLandmarkCurrentBlendshape();
+		const VectorXd& vecLandmarkBlendshape = m_pBfmManager->getLandmarkCurrentBlendshape();
 		for(unsigned int iLandmark = 0; iLandmark < 68; iLandmark++) {
 			out.push_back(cv::Point3f(
 				vecLandmarkBlendshape(iLandmark * 3), 
@@ -415,9 +416,9 @@ bool MHPEProblem::solveExtParams(long mode, double ca, double cb)
 		std::cout << rvec << std::endl;
 		std::cout << tvec << std::endl;
 		#endif
-		m_pModel->setMatR(rvec);
-		m_pModel->setVecT(tvec);
-		m_pModel->genExtParams();
+		m_pBfmManager->setMatR(rvec);
+		m_pBfmManager->setVecT(tvec);
+		m_pBfmManager->genExtParams();
 		return true;
 	}
 	else if(mode & SolveExtParamsMode_UseLinearizedRadians)
@@ -433,14 +434,14 @@ bool MHPEProblem::solveExtParams(long mode, double ca, double cb)
 			BFM_DEBUG("	1) initial values have been set in advance or are 0s.\n");
 		}
 		
-		m_pModel->genTransMat();	
+		m_pBfmManager->genTransMat();	
 
 		CERES_INIT(N_CERES_ITERATIONS, N_CERES_THREADS, B_CERES_STDCOUT);
 		while(true) 
 		{
 			ceres::Problem problem;
 			double aSmallExtParams[6] = { 0.f };
-			ceres::CostFunction *costFunction = LinearizedExtParamsReprojErr::create(m_pObservedPoints, m_pModel, m_aLandmarkMap, ca, cb);
+			ceres::CostFunction *costFunction = LinearizedExtParamsReprojErr::create(m_pObservedPoints, m_pBfmManager, m_aLandmarkMap, ca, cb);
 			problem.AddResidualBlock(costFunction, nullptr, aSmallExtParams);
 			ceres::Solve(options, &problem, &summary);
 			BFM_DEBUG("%s\n", summary.BriefReport().c_str());
@@ -454,13 +455,13 @@ bool MHPEProblem::solveExtParams(long mode, double ca, double cb)
 				break; 
 			}
 
-			m_pModel->accExtParams(aSmallExtParams);
+			m_pBfmManager->accExtParams(aSmallExtParams);
 			
 			#ifdef _DEBUG
 			bfm_utils::PrintArr(aSmallExtParams, 6);							
 			#endif
 		}
-		m_pModel->genExtParams();
+		m_pBfmManager->genExtParams();
 		return (summary.termination_type == ceres::CONVERGENCE);
 	}
 	else
@@ -485,8 +486,8 @@ bool MHPEProblem::solveExtParams(long mode, double ca, double cb)
 		#endif
 
 		ceres::Problem problem;
-		double *ext_params = m_pModel->getMutableExtParams();
-		ceres::CostFunction *costFunction = ExtParamsReprojErr::create(m_pObservedPoints, m_pModel, m_aLandmarkMap);
+		double *ext_params = m_pBfmManager->getMutableExtParams().data();
+		ceres::CostFunction *costFunction = ExtParamsReprojErr::create(m_pObservedPoints, m_pBfmManager, m_aLandmarkMap);
 		problem.AddResidualBlock(costFunction, nullptr, ext_params);
 		ceres::Solver::Options options;
 		options.max_num_iterations = 100;
@@ -500,7 +501,7 @@ bool MHPEProblem::solveExtParams(long mode, double ca, double cb)
 		#ifndef HPE_SHUT_UP
 		std::cout << summary.BriefReport() << std::endl;
 		#endif
-		m_pModel->genTransMat();
+		m_pBfmManager->genTransMat();
 		return (summary.termination_type == ceres::CONVERGENCE);
 	}
 }
@@ -509,17 +510,17 @@ bool MHPEProblem::solveExtParams(long mode, double ca, double cb)
 bool MHPEProblem::solveShapeCoef() {
 	BFM_DEBUG(PRINT_GREEN "#################### Estimate Shape Coefficients ####################\n" COLOR_END);
 	ceres::Problem problem;
-	double *aShapeCoef = m_pModel->getMutableShapeCoef();
-	ceres::CostFunction *costFunction = ShapeCoefReprojErr::create(m_pObservedPoints, m_pModel, m_aLandmarkMap);
-	ceres::DynamicAutoDiffCostFunction<ShapeCoefRegTerm> *regTerm = ShapeCoefRegTerm::create(m_pModel);
-	regTerm->AddParameterBlock(m_pModel->getNIdPcs());
-	regTerm->SetNumResiduals(m_pModel->getNIdPcs());
+	double *aShapeCoef = m_pBfmManager->getMutableShapeCoef();
+	ceres::CostFunction *costFunction = ShapeCoefReprojErr::create(m_pObservedPoints, m_pBfmManager, m_aLandmarkMap);
+	ceres::DynamicAutoDiffCostFunction<ShapeCoefRegTerm> *regTerm = ShapeCoefRegTerm::create(m_pBfmManager);
+	regTerm->AddParameterBlock(m_pBfmManager->getNIdPcs());
+	regTerm->SetNumResiduals(m_pBfmManager->getNIdPcs());
 	problem.AddResidualBlock(costFunction, nullptr, aShapeCoef);
 	problem.AddResidualBlock(regTerm, nullptr, aShapeCoef);
 	CERES_INIT(N_CERES_ITERATIONS, N_CERES_THREADS, B_CERES_STDCOUT);
 	ceres::Solve(options, &problem, &summary);
 	BFM_DEBUG("%s\n", summary.BriefReport().c_str());
-	m_pModel->genLandmarkBlendshape();
+	m_pBfmManager->genLandmarkBlendshape();
 	return (summary.termination_type == ceres::CONVERGENCE);
 }
 
@@ -527,17 +528,17 @@ bool MHPEProblem::solveShapeCoef() {
 bool MHPEProblem::solveExprCoef() {
 	BFM_DEBUG(PRINT_GREEN "#################### Estimate Expression Coefficients ####################\n" COLOR_END);
 	ceres::Problem problem;
-	double *aExprCoef = m_pModel->getMutableExprCoef();
-	ceres::CostFunction *costFunction = ExprCoefReprojErr::create(m_pObservedPoints, m_pModel, m_aLandmarkMap);
-	ceres::DynamicAutoDiffCostFunction<ExprCoefRegTerm> *regTerm = ExprCoefRegTerm::create(m_pModel);
-	regTerm->AddParameterBlock(m_pModel->getNExprPcs());
-	regTerm->SetNumResiduals(m_pModel->getNExprPcs());
+	double *aExprCoef = m_pBfmManager->getMutableExprCoef();
+	ceres::CostFunction *costFunction = ExprCoefReprojErr::create(m_pObservedPoints, m_pBfmManager, m_aLandmarkMap);
+	ceres::DynamicAutoDiffCostFunction<ExprCoefRegTerm> *regTerm = ExprCoefRegTerm::create(m_pBfmManager);
+	regTerm->AddParameterBlock(m_pBfmManager->getNExprPcs());
+	regTerm->SetNumResiduals(m_pBfmManager->getNExprPcs());
 	problem.AddResidualBlock(costFunction, nullptr, aExprCoef);
 	problem.AddResidualBlock(regTerm, nullptr, aExprCoef);
 	CERES_INIT(N_CERES_ITERATIONS, N_CERES_THREADS, B_CERES_STDCOUT);
 	ceres::Solve(options, &problem, &summary);
 	BFM_DEBUG("%s\n", summary.BriefReport().c_str());
-	m_pModel->genLandmarkBlendshape();
+	m_pBfmManager->genLandmarkBlendshape();
 	return (summary.termination_type == ceres::CONVERGENCE);
 }
 

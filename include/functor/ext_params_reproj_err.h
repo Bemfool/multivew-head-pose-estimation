@@ -17,7 +17,7 @@ class MultiExtParamsReprojErr
 public:                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
 	MultiExtParamsReprojErr(
 		const std::vector<std::pair<FullObjectDetection, int>> &aObjDetections, 
-		BaselFaceModelManager *model, 
+		BfmManager *model, 
 		DataManager* pDataManager) : 
 		m_aObjDetections(aObjDetections), 
 	    m_pModel(model), 
@@ -75,7 +75,7 @@ public:
 		return true;
 	}
 
-	static ceres::CostFunction *create(const std::vector<std::pair<dlib::full_object_detection, int>> &aObjDetections, BaselFaceModelManager *model, DataManager* pDataManager) 
+	static ceres::CostFunction *create(const std::vector<std::pair<dlib::full_object_detection, int>> &aObjDetections, BfmManager *model, DataManager* pDataManager) 
 	{
 		return (new ceres::AutoDiffCostFunction<MultiExtParamsReprojErr, N_LANDMARKS * 2 * N_PHOTOS + 1, N_EXT_PARAMS, 1>(
 			new MultiExtParamsReprojErr(aObjDetections, model, pDataManager)));
@@ -83,7 +83,7 @@ public:
 
 private:
 	std::vector<std::pair<dlib::full_object_detection, int>> m_aObjDetections;
-    BaselFaceModelManager *m_pModel;
+    BfmManager *m_pModel;
 	DataManager* m_pDataManager;
 	double m_scWeight = 1e6;
 	double m_scMean = 0.0075;
@@ -96,7 +96,7 @@ public:
 	MultiExtParams3D3DReprojErr(
 		double *pPoints, 
 		double dScMean, 
-		BaselFaceModelManager *model, 
+		BfmManager *model, 
 		DataManager* pDataManager) : 
 		m_pPoints(pPoints),
 		m_dScMean(dScMean),
@@ -134,7 +134,7 @@ public:
 		return true;
 	}
 
-	static ceres::CostFunction *create(double *pPoints, double dScMean, BaselFaceModelManager *model, DataManager* pDataManager) 
+	static ceres::CostFunction *create(double *pPoints, double dScMean, BfmManager *model, DataManager* pDataManager) 
 	{
 		return (new ceres::AutoDiffCostFunction<MultiExtParams3D3DReprojErr, N_LANDMARKS * 3, N_EXT_PARAMS>(
 			new MultiExtParams3D3DReprojErr(pPoints, dScMean, model, pDataManager)));
@@ -142,7 +142,7 @@ public:
 
 private:
 	double *m_pPoints;
-    BaselFaceModelManager *m_pModel;
+    BfmManager *m_pModel;
 	DataManager* m_pDataManager;
 	double m_scWeight = 1e6;
 	double m_dScMean = 0.0075;
@@ -153,7 +153,7 @@ private:
 class ExtParamsReprojErr 
 {
 public:                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
-	ExtParamsReprojErr(dlib::full_object_detection *observedPoints, BaselFaceModelManager *model, std::vector<unsigned int> &aLandmarkMap) 
+	ExtParamsReprojErr(dlib::full_object_detection *observedPoints, BfmManager *model, std::vector<unsigned int> &aLandmarkMap) 
 	: m_pObservedPoints(observedPoints), m_pModel(model), m_aLandmarkMap(aLandmarkMap) { }
 	
     template<typename _Tp>
@@ -175,7 +175,7 @@ public:
 		return true;
 	}
 
-	static ceres::CostFunction *create(dlib::full_object_detection *observedPoints, BaselFaceModelManager *model, std::vector<unsigned int> aLandmarkMap) 
+	static ceres::CostFunction *create(dlib::full_object_detection *observedPoints, BfmManager *model, std::vector<unsigned int> aLandmarkMap) 
 	{
 		return (new ceres::AutoDiffCostFunction<ExtParamsReprojErr, N_LANDMARKS * 2, N_EXT_PARAMS>(
 			new ExtParamsReprojErr(observedPoints, model, aLandmarkMap)));
@@ -183,7 +183,7 @@ public:
 
 private:
 	dlib::full_object_detection *m_pObservedPoints;
-    BaselFaceModelManager *m_pModel;
+    BfmManager *m_pModel;
 	std::vector<unsigned int> m_aLandmarkMap;
 };
 
@@ -191,10 +191,10 @@ private:
 class LinearizedExtParamsReprojErr 
 {
 public:                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
-	LinearizedExtParamsReprojErr(dlib::full_object_detection *observedPoints, BaselFaceModelManager *model, std::vector<unsigned int> aLandmarkMap) 
+	LinearizedExtParamsReprojErr(dlib::full_object_detection *observedPoints, BfmManager *model, std::vector<unsigned int> aLandmarkMap) 
 	: m_pObservedPoints(observedPoints), m_pModel(model), m_aLandmarkMap(aLandmarkMap) { }
 
-	LinearizedExtParamsReprojErr(dlib::full_object_detection *observedPoints, BaselFaceModelManager *model, std::vector<unsigned int> aLandmarkMap, double a, double b) 
+	LinearizedExtParamsReprojErr(dlib::full_object_detection *observedPoints, BfmManager *model, std::vector<unsigned int> aLandmarkMap, double a, double b) 
 	: m_pObservedPoints(observedPoints), m_pModel(model), m_aLandmarkMap(aLandmarkMap), m_dRotWeight(a), m_dTranWeight(b) {}
 
 
@@ -228,13 +228,13 @@ public:
 		return true;
 	}
 
-	static ceres::CostFunction *create(dlib::full_object_detection *observedPoints, BaselFaceModelManager *model, std::vector<unsigned int> aLandmarkMap) 
+	static ceres::CostFunction *create(dlib::full_object_detection *observedPoints, BfmManager *model, std::vector<unsigned int> aLandmarkMap) 
 	{
 		return (new ceres::AutoDiffCostFunction<LinearizedExtParamsReprojErr, N_LANDMARKS * 2 + N_EXT_PARAMS, N_EXT_PARAMS>(
 			new LinearizedExtParamsReprojErr(observedPoints, model, aLandmarkMap)));
 	}
 
-	static ceres::CostFunction *create(dlib::full_object_detection *observedPoints, BaselFaceModelManager *model, std::vector<unsigned int> aLandmarkMap, double a, double b) 
+	static ceres::CostFunction *create(dlib::full_object_detection *observedPoints, BfmManager *model, std::vector<unsigned int> aLandmarkMap, double a, double b) 
 	{
 		return (new ceres::AutoDiffCostFunction<LinearizedExtParamsReprojErr, N_LANDMARKS * 2 + N_EXT_PARAMS, N_EXT_PARAMS>(
 			new LinearizedExtParamsReprojErr(observedPoints, model, aLandmarkMap, a, b)));
@@ -243,7 +243,7 @@ public:
 
 private:
 	dlib::full_object_detection *m_pObservedPoints;
-    BaselFaceModelManager *m_pModel;
+    BfmManager *m_pModel;
 	std::vector<unsigned int> m_aLandmarkMap;
 	/* residual coefficients */
 	double m_dRotWeight = 1.0;	/* for rotation */

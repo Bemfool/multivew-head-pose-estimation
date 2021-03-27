@@ -39,7 +39,7 @@ int main(int argc, char* argv[])
             R"(/home/keith/Data/BaselFaceModel_mod.h5)"), 
             "Path of Basel Face Model.")
         ("landmark_idx_path", po::value<string>(&landmarkIdxPath)->default_value(
-            R"(/home/keith/Project/head-pose-estimation/data/example_landmark_68.anl)"), 
+            R"(../data/example_landmark_68.anl)"), 
             "Path of corresponding between dlib and model vertex index.")
         ("dlib_landmark_det_path", po::value<string>(&dlibLandmarkDetPath)->default_value(
             R"(/home/keith/Data/shape_predictor_68_face_landmarks.dat)"), 
@@ -64,10 +64,10 @@ int main(int argc, char* argv[])
     }
 
     LOG(INFO) << "Check inputs:";
-    LOG(INFO) << "Project path:\t" << projectPath;
-    LOG(INFO) << "Bfm path:\t" << bfmH5Path;
-    LOG(INFO) << "Landmark indices path:\t" << landmarkIdxPath;
-    LOG(INFO) << "Dlib landmark detector path:\t" << dlibLandmarkDetPath;
+    LOG(INFO) << "\tProject path:\t\t\t" << projectPath;
+    LOG(INFO) << "\tBfm path:\t\t\t" << bfmH5Path;
+    LOG(INFO) << "\tLandmark indices path:\t\t" << landmarkIdxPath;
+    LOG(INFO) << "\tDlib landmark detector path:\t" << dlibLandmarkDetPath;
     LOG(INFO) << "\n";
 
 	MHPEProblem *pHpeProblem = new MHPEProblem(projectPath, bfmH5Path, landmarkIdxPath);

@@ -5,6 +5,7 @@
 #include <string>
 #include <thread>
 #include <fstream>
+#include <iomanip>
 
 
 namespace tiny_progress
@@ -58,7 +59,7 @@ namespace tiny_progress
                     else if(i == nCurPos) os << ">";
                     else os << " "; 
                 }
-                os << "] " << setw(3) << fixed << setprecision(0) << (double)nCurTasks / nTasks * 100 << "% ";
+                os << "] " << std::setw(3) << std::fixed << std::setprecision(0) << (double)nCurTasks / nTasks * 100 << "% ";
                 os << sMsg << " " << sLoadSymbol[(cnt / 1000) % 4] << "\r";
                 os.flush();
                 if(nCurTasks == nTasks)

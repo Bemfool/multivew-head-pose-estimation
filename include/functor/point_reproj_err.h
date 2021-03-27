@@ -15,7 +15,7 @@ class PointReprojErr {
 public:                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
 	PointReprojErr(
 		const DetPairVector &aObjDetections, 
-		BaselFaceModelManager *model, 
+		BfmManager *model, 
 		DataManager* pDataManager) : 
 		m_aObjDetections(aObjDetections), 
 		m_pModel(model), 
@@ -70,7 +70,7 @@ public:
 
 	static CostFunction *create(
 		const DetPairVector &aObjDetections, 
-		BaselFaceModelManager* pModel, 
+		BfmManager* pModel, 
 		DataManager* pDataManager) 
 	{
 		return (new AutoDiffCostFunction<PointReprojErr, N_RES, 68 * 3>(
@@ -79,7 +79,7 @@ public:
 
 private:
 	DetPairVector m_aObjDetections;
-    BaselFaceModelManager *m_pModel;
+    BfmManager *m_pModel;
 	DataManager* m_pDataManager;
 };
 
