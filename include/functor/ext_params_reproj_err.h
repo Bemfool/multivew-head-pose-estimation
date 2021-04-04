@@ -90,62 +90,63 @@ private:
 };
 
 
-class MultiExtParams3D3DReprojErr 
+class ExtParams3D3DReprojErr 
 {
 public:                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
-	MultiExtParams3D3DReprojErr(
-		double *pPoints, 
-		double dScMean, 
-		BfmManager *model, 
-		DataManager* pDataManager) : 
-		m_pPoints(pPoints),
-		m_dScMean(dScMean),
-	    m_pModel(model), 
+	ExtParams3D3DReprojErr(
+		std::vector<double>& vPts,  
+		std::shared_ptr<BfmManager>& pBfmManager, 
+		std::shared_ptr<DataManager>& pDataManager) : 
+		m_vPts(vPts),
+	    m_pBfmManager(pBfmManager), 
 		m_pDataManager(pDataManager) { }
 	
     template<typename _Tp>
 	bool operator () (const _Tp* const pExtParams, _Tp* aResiduals) const 
 	{
-		_Tp fx, fy, cx, cy;
+		_Tp fx, fy, cx, cy, sc;
 		_Tp u, v;
 		_Tp invZ;
 		int iFace;
 		
 		// Fetch intrinsic parameters
-		fx = static_cast<_Tp>(m_pModel->getFx());
-		fy = static_cast<_Tp>(m_pModel->getFy());
-		cx = static_cast<_Tp>(m_pModel->getCx());
-		cy = static_cast<_Tp>(m_pModel->getCy());
+		fx = static_cast<_Tp>(m_pBfmManager->getFx());
+		fy = static_cast<_Tp>(m_pBfmManager->getFy());
+		cx = static_cast<_Tp>(m_pBfmManager->getCx());
+		cy = static_cast<_Tp>(m_pBfmManager->getCy());
 
 		// Fetch camera matrix array
-		const std::vector<Eigen::Matrix4f>& aMatCams = m_pDataManager->getCameraMatrices();
+		const auto& aMatCams = m_pDataManager->getCameraMatrices();
+		sc = static_cast<_Tp>(m_pBfmManager->getScale());
 
 		// Transform
-		const Matrix<_Tp, Dynamic, 1> vecPts = m_pModel->getLandmarkCurrentBlendshape().template cast<_Tp>() * (_Tp)m_dScMean;
-		const Matrix<_Tp, Dynamic, 1> vecRotPts = bfm_utils::TransPoints(pExtParams, vecPts);
+		const Matrix<_Tp, Dynamic, 1> vPts = m_pBfmManager->getLandmarkCurrentBlendshape().template cast<_Tp>() * sc;
+		const Matrix<_Tp, Dynamic, 1> vRotPts = bfm_utils::TransPoints(pExtParams, vPts);
 
 		for(auto i = 0u; i < N_LANDMARKS; i++)
 		{
-			aResiduals[i * 3] = vecRotPts(i * 3) - m_pPoints[i * 3];
-			aResiduals[i * 3 + 1] = vecRotPts(i * 3 + 1) - m_pPoints[i * 3 + 1];
-			aResiduals[i * 3 + 2] = vecRotPts(i * 3 + 2) - m_pPoints[i * 3 + 2];
+			aResiduals[i * 3] = vRotPts(i * 3) - m_vPts[i * 3];
+			aResiduals[i * 3 + 1] = vRotPts(i * 3 + 1) - m_vPts[i * 3 + 1];
+			aResiduals[i * 3 + 2] = vRotPts(i * 3 + 2) - m_vPts[i * 3 + 2];
 		}
 
 		return true;
 	}
 
-	static ceres::CostFunction *create(double *pPoints, double dScMean, BfmManager *model, DataManager* pDataManager) 
+	static ceres::CostFunction *create(
+		std::vector<double>& vPts, 
+		std::shared_ptr<BfmManager>& pBfmManager, 
+		std::shared_ptr<DataManager>& pDataManager) 
 	{
-		return (new ceres::AutoDiffCostFunction<MultiExtParams3D3DReprojErr, N_LANDMARKS * 3, N_EXT_PARAMS>(
-			new MultiExtParams3D3DReprojErr(pPoints, dScMean, model, pDataManager)));
+		return (new ceres::AutoDiffCostFunction<ExtParams3D3DReprojErr, N_LANDMARKS * 3, N_EXT_PARAMS>(
+			new ExtParams3D3DReprojErr(vPts, pBfmManager, pDataManager)));
 	}
 
 private:
-	double *m_pPoints;
-    BfmManager *m_pModel;
-	DataManager* m_pDataManager;
+	std::vector<double> m_vPts;
+    std::shared_ptr<BfmManager> m_pBfmManager;
+	std::shared_ptr<DataManager> m_pDataManager;
 	double m_scWeight = 1e6;
-	double m_dScMean = 0.0075;
 };
 
 

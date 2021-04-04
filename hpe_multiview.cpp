@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <chrono>
+#include <memory>
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 
@@ -39,7 +40,7 @@ int main(int argc, char* argv[])
             R"(/home/keith/Data/BaselFaceModel_mod.h5)"), 
             "Path of Basel Face Model.")
         ("landmark_idx_path", po::value<string>(&landmarkIdxPath)->default_value(
-            R"(../data/example_landmark_68.anl)"), 
+            R"(/home/keith/Project/head-pose-estimation/data/example_landmark_68.anl)"), 
             "Path of corresponding between dlib and model vertex index.")
         ("dlib_landmark_det_path", po::value<string>(&dlibLandmarkDetPath)->default_value(
             R"(/home/keith/Data/shape_predictor_68_face_landmarks.dat)"), 
@@ -70,11 +71,11 @@ int main(int argc, char* argv[])
     LOG(INFO) << "\tDlib landmark detector path:\t" << dlibLandmarkDetPath;
     LOG(INFO) << "\n";
 
-	MHPEProblem *pHpeProblem = new MHPEProblem(projectPath, bfmH5Path, landmarkIdxPath);
-	BaselFaceModelManager *pBfmManager = pHpeProblem->getModel();
+	std::unique_ptr<MHPEProblem> pHpeProblem(new MHPEProblem(projectPath, bfmH5Path, landmarkIdxPath, dlibLandmarkDetPath));
+	std::shared_ptr<BfmManager>& pBfmManager = pHpeProblem->getBfmManager();
 
     auto start = std::chrono::system_clock::now();    // Start of solving 
-    pHpeProblem->solve(SolveExtParamsMode_Default, dlibLandmarkDetPath);
+    pHpeProblem->solve(SolveExtParamsMode_Default);
     auto end = std::chrono::system_clock::now();    // End of solving
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     LOG(INFO) << "Cost of solution: "

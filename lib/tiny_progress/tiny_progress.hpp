@@ -31,6 +31,13 @@ namespace tiny_progress
 
         void end(std::ostream& os, std::string sMsg)
         {
+            bool bIsNotFinished = false;
+            if(m_nCurTasks != m_nTasks)
+            {
+                m_nCurTasks = m_nTasks;
+                bIsNotFinished = true;
+            }
+                
             if(m_t.joinable())
                 m_t.join();
             os << "[";
@@ -42,6 +49,12 @@ namespace tiny_progress
                 os << " ";
             os << "\n";
             os.flush();
+
+            if(bIsNotFinished)
+            {
+                os << "[WARNING] Code not completed.\n";
+                os.flush();
+            }
         }
         
 

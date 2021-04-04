@@ -13,6 +13,7 @@
 #include <iostream>
 #include <fstream>
 #include <assert.h>
+#include <memory>
 
 #include "ceres/ceres.h"
 
@@ -27,20 +28,15 @@
 #include "data_manager.h"
 
 
-using FullObjectDetection = dlib::full_object_detection;
-using DetPairVector = std::vector<std::pair<FullObjectDetection, int>>;
 using Eigen::Matrix;
 using Eigen::Vector3d;
 using Eigen::VectorXd;
 using Summary = ceres::Solver::Summary;
 
-
-#define CERES_INIT(N_ITERATIONS, N_THREADS, B_STDCOUT) \
-		ceres::Solver::Options options; \
+#define CERES_INIT(options, N_ITERATIONS, N_THREADS, B_STDCOUT) \
 		options.max_num_iterations = N_ITERATIONS; \
  		options.num_threads = N_THREADS; \
-		options.minimizer_progress_to_stdout = B_STDCOUT; \
-		ceres::Solver::Summary summary;
+		options.minimizer_progress_to_stdout = B_STDCOUT; 
 
 
 class MHPEProblem
@@ -61,27 +57,27 @@ public:
 	 */
 
 	MHPEProblem(
-		const std::string& strProjectPath,
-        const std::string& strBfmH5Path,
-        const std::string& strLandmarkIdxPath
+		const std::string& sProjectPath,
+        const std::string& sBfmH5Path,
+        const std::string& sLandmarkIdxPath,
+		const std::string& sDlibDetPath
 	);
 	Status init(
-		const std::string& strProjectPath,
-        const std::string& strBfmH5Path,
-        const std::string& strLandmarkIdxPath
+		const std::string& sProjectPath,
+        const std::string& sBfmH5Path,
+        const std::string& sLandmarkIdxPath,
+		const std::string& sDlibDetPath
 	);
 
-	inline BfmManager *getModel() { return m_pBfmManager; }
+	// inline BfmManager *getModel() { return m_pBfmManager; }
+	inline std::shared_ptr<BfmManager>& getBfmManager() { return m_pBfmManager; }
 
-	void solve(SolveExtParamsMode mode, const std::string& strDlibDetPath);
+	void solve(SolveExtParamsMode mode);
 	
-	void estExtParams(double *pPoints, double dScMean);
 	Summary estExtParams(const DetPairVector&  aObjDets);
-	Summary estShapeCoef(const DetPairVector&  aObjDets);
-	Summary estExprCoef(const DetPairVector&  aObjDets);
+	// Summary estShapeCoef(const DetPairVector&  aObjDets);
+	// Summary estExprCoef(const DetPairVector&  aObjDets);
 	
-	inline void setObservedPoints(FullObjectDetection *pObservedPoints) { m_pObservedPoints = pObservedPoints; }
-
 	bool solveExtParams(long mode = SolveExtParamsMode_UseCeres, double ca = 1.0, double cb = 0.0);
 
 	bool solveShapeCoef();
@@ -93,13 +89,23 @@ public:
 private:
 
 	bool is_close_enough(double *ext_params, double rotation_eps = 0, double translation_eps = 0);
-	
-	std::vector<std::pair<FullObjectDetection, int>> m_aObjDetections;
-	FullObjectDetection* m_pObservedPoints;
-	BfmManager *m_pBfmManager;
-	DataManager* m_pDataManager;
-	std::vector<unsigned int> m_aLandmarkMap;
 
+	std::vector<double> estInit3dPts(const std::vector<DetPair>& vDetPairs);
+	void estInitSc(const std::vector<double>& vPts);
+	void estInitExtParams(std::vector<double>& vPts);
+	void initWin(
+		dlib::image_window& window, 
+		const std::string& sTitle, 
+		const Arr2d& img,
+		const ObjDet& objDet,
+		bool bIsValid
+	);
+	void rmOutliers();
+
+	shared_ptr<BfmManager> m_pBfmManager;
+	shared_ptr<DataManager> m_pDataManager;
+
+	std::vector<unsigned int> m_aLandmarkMap;
 };
 
 

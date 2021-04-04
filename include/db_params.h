@@ -31,13 +31,19 @@ const unsigned int END = 24u;
 
 const double ZOOM_SCALE =  0.1;
 
-const int N_CERES_ITERATIONS = 500;
-const int N_CERES_THREADS = 16;
-#ifndef _DEBUG
-const bool B_CERES_STDCOUT = true;
-#else
-const bool B_CERES_STDCOUT = false;
-#endif
+namespace mhpe
+{
+	namespace Utils
+	{
+		const int N_CERES_ITERATIONS = 500;
+		const int N_CERES_THREADS = 8;
+		#ifndef _DEBUG
+		const bool B_CERES_STDCOUT = true;
+		#else
+		const bool B_CERES_STDCOUT = false;
+		#endif
+	}
+}
 
 enum SolveExtParamsMode
 {

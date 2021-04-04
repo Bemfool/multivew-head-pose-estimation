@@ -14,6 +14,11 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 
+#include <dlib/image_io.h>
+#include <dlib/image_processing/frontal_face_detector.h>
+#include <dlib/image_processing/render_face_detections.h>
+#include <dlib/image_processing.h>
+
 #include "glog/logging.h"
 
 #include <fstream>
@@ -25,6 +30,9 @@
 using namespace tinyxml2;
 using namespace boost::filesystem;
 
+using ObjDet = dlib::full_object_detection;
+using DetPair = std::pair<ObjDet, int>;
+using Arr2d = dlib::array2d<dlib::rgb_pixel>;
 
 /*
  * Directory:
@@ -70,7 +78,7 @@ using namespace boost::filesystem;
 class DataManager
 {
 public:
-	DataManager(const std::string &rootDir) :
+	DataManager(const std::string &rootDir, const std::string& sDlibDetPath) :
 		m_pathRootDir(path(rootDir)),
 		m_pathPhotoDir(m_pathRootDir / "image"),
 		m_pathXml(m_pathRootDir / "cam.xml")
@@ -89,12 +97,15 @@ public:
 			return;
 		}
 
+		this->preprocess(sDlibDetPath);
+
 		LOG(INFO) << "Load successfully\n";
 		LOG(INFO) << "********************************************";
 		LOG(INFO) << "************* Load Data ********************";
 		LOG(INFO) << "********************************************";
 		LOG(INFO) << "Camera intrinsic parameters(f cx cy):\t" << m_f << "\t" << m_cx << "\t" << m_cy;
 		LOG(INFO) << "Number of view:\t" << m_nViews;
+		LOG(INFO) << "\n";
 
 
 	}
@@ -104,17 +115,22 @@ public:
 	double getCy() const { return m_cy; }
 	double getWidth() const { return m_width; }
 	double getHeight() const { return m_height; }
-	unsigned int getFaces() const { return m_nViews; }
+	unsigned int getNViews() const { return m_nViews; }
 
-	const std::vector<Eigen::Matrix<float, 4, 4>>& getCameraMatrices() const {return m_aCameraMatrices; }
-	const std::vector<Eigen::Matrix<float, 3, 4>>& getProjMatrices() const { return m_aProjMatrices; }
-	const std::vector<Eigen::Matrix4f>& getInvTransMatrices() const { return m_aInvTransMatrices; }
-	const std::vector<Eigen::Vector3f>& getCamPositions() const { return m_aCamPositions; }
-	std::vector<std::vector<float>>& getLandmarkCoordsSets() { return m_aLandmarkCoordsSets; }
-	const std::vector<Texture>& getTextures() const { return m_aTextures; }
+	const auto& getCameraMatrices() const {return m_aCameraMatrices; }
+	const auto& getProjMatrices() const { return m_aProjMatrices; }
+	const auto& getInvTransMatrices() const { return m_aInvTransMatrices; }
+	const auto& getCamPositions() const { return m_aCamPositions; }
+	const auto& getTextures() const { return m_aTextures; }
 
+	auto& getRotTypes() { return m_aRotTypes; }
+	const auto& getArr2dImgs() const { return m_a2dImgs; }
+	const auto& getArr2dTransImgs() const { return m_a2dTransImgs; }
+	const auto& getDets() const { return m_aDets; }
+	const auto& getTransDets() const { return m_aTransDets; }
+
+private:
 	path m_pathRootDir;
-	path m_pathLandmarkDir;
 	path m_pathPhotoDir;
 	path m_pathXml;
 
@@ -132,11 +148,17 @@ public:
 	std::vector<Eigen::Matrix<float, 3, 4>> m_aTransMatrices;
 	std::vector<Eigen::Matrix4f> m_aInvTransMatrices;
 	std::vector<Eigen::Vector3f> m_aCamPositions;
-
-	std::vector<std::vector<float>> m_aLandmarkCoordsSets;
 	std::vector<Texture> m_aTextures;
 
-private:
+	double m_dZoomSc = 0.1;
+	std::vector<RotateType> m_aRotTypes;
+	std::vector<Arr2d> m_a2dImgs;
+	std::vector<Arr2d> m_a2dTransImgs;
+	std::vector<ObjDet> m_aDets;
+	std::vector<ObjDet> m_aTransDets;
+
+	dlib::frontal_face_detector m_faceDetector;
+	dlib::shape_predictor m_shapePredictor;
 
 	Status loadCamInfo()
 	{
@@ -330,43 +352,114 @@ private:
 	{
 		LOG(INFO) << "Load textures";
 
-		// int barWidth = 70, curPos;
-		// double proStep = 1.0 / m_nViews, proCurrent = 0.0;
-		// m_aTextures.resize(m_nViews);
-		// for (auto iFace = 0; iFace < m_nViews; iFace++)
-		// {
-		// 	std::cout << "[";	
-		// 	curPos = barWidth * proCurrent;	
-		// 	proCurrent += proStep;
-		// 	for(auto i = 0; i < barWidth; ++i)
-		// 	{
-		// 		if(i < curPos) std::cout << "=";
-		// 		else if(i == curPos) std::cout << ">";
-		// 		else std::cout << " ";
-		// 	}
-		// 	std::cout << "]" << setw(3) << fixed << setprecision(0) << proCurrent * 100 << "% ";
-
-		// 	path pathTexture = m_pathPhotoDir / (file_utils::Id2Str(iFace) + ".jpg");
-
-		// 	std::cout << "Load: " << pathTexture.filename().string() << "\r";
-		// 	std::cout.flush();
-
-		// 	m_aTextures[iFace] = Texture::LoadTexture(pathTexture.string());
-		// }
-		// std::cout << std::endl;
-
 		m_aTextures.resize(m_nViews);
 		tiny_progress::ProgressBar pb(m_nViews);
 		pb.begin(std::ref(std::cout), "Loading.");
 		for (auto iFace = 0; iFace < m_nViews; iFace++)
 		{
 			path pathTexture = m_pathPhotoDir / (file_utils::Id2Str(iFace) + ".jpg");
-			m_aTextures[iFace] = Texture::LoadTexture(pathTexture.string());
 			pb.update(1, "Loading " + pathTexture.filename().string());
+
+			m_aTextures[iFace] = Texture::LoadTexture(pathTexture.string());
 		}
-		pb.end(std::ref(std::cout), "Done.");
+		pb.end(std::ref(std::cout), "Load texture done.");
 		return Status_Ok;
 	}
+
+
+	void preprocess(const std::string& sDlibDetPath)
+	{
+		m_faceDetector = dlib::get_frontal_face_detector();
+		dlib::deserialize(sDlibDetPath) >> m_shapePredictor;
+
+		m_a2dImgs.resize(m_nViews);
+		m_a2dTransImgs.resize(m_nViews);
+		m_aDets.resize(m_nViews);
+		m_aTransDets.resize(m_nViews);
+		m_aRotTypes = {	// Outlier: 2(DETECT TOO BAD) 3(FIT TOO BAD) 20(FIT NOT GOOD)
+			RotateType_Invalid, RotateType_Invalid, RotateType_Invalid, RotateType_Invalid, RotateType_CCW, 
+			RotateType_CW, RotateType_CW, RotateType_CW, RotateType_CW, RotateType_Invalid,
+			RotateType_CCW, RotateType_Invalid, RotateType_CCW, RotateType_Invalid, RotateType_CCW,
+			RotateType_CCW, RotateType_CCW, RotateType_CCW, RotateType_CCW, RotateType_Invalid,
+			RotateType_Invalid, RotateType_CW, RotateType_Invalid, RotateType_Invalid
+		};
+	
+		tiny_progress::ProgressBar pb(m_nViews);
+		pb.begin(std::ref(std::cout), " Loading.");
+		for(auto iView = 0; iView < m_nViews; ++iView)
+		{
+			const Texture& tex = m_aTextures[iView];
+			const std::string &sTexPath = tex.getPath();
+			pb.update(1, "Detecting " + sTexPath);
+
+			if(m_aRotTypes[iView] == RotateType_Invalid)
+				continue;
+
+			std::vector<dlib::rectangle> aRecs;
+
+			dlib::load_image(m_a2dImgs[iView], sTexPath);
+			dlib::resize_image(m_dZoomSc, m_a2dImgs[iView]);
+
+			dlib::rotate_image(m_a2dImgs[iView], m_a2dTransImgs[iView], M_PI * 0.5);
+			aRecs = m_faceDetector(m_a2dTransImgs[iView]);
+			if(aRecs.size() == 0)
+			{
+				dlib::rotate_image(m_a2dImgs[iView], m_a2dTransImgs[iView], M_PI * 1.5);
+				aRecs = m_faceDetector(m_a2dTransImgs[iView]);
+				if(aRecs.size() == 0)
+				{
+					m_aRotTypes[iView] = RotateType_Invalid;
+					continue;
+				}
+				else
+				{
+					m_aRotTypes[iView] = RotateType_CW;
+				}
+			}
+			else
+			{
+				m_aRotTypes[iView] = RotateType_CCW;
+			}
+
+		
+			ObjDet objDet = m_shapePredictor(m_a2dTransImgs[iView], aRecs[0]);
+			m_aTransDets[iView] = objDet;
+
+			for(auto j = 0; j < N_DLIB_LANDMARKS; j++)
+			{
+				auto x = objDet.part(j).x(), y = objDet.part(j).y();
+				if(m_aRotTypes[iView] == RotateType_CCW)
+				{
+					objDet.part(j).x() = tex.getWidth() * m_dZoomSc - y;
+					objDet.part(j).y() = x;
+				}
+				else
+				{
+					objDet.part(j).x() = y;
+					objDet.part(j).y() = tex.getHeight() * m_dZoomSc - x;
+				}
+			}
+
+			m_aDets[iView] = objDet;
+		}
+		pb.end(std::ref(std::cout), "Detection done.");
+
+		LOG(INFO) << "Detection result:";
+		LOG(INFO) << "----------------------------";
+		for(auto iView = 0; iView < m_nViews; ++iView)
+		{
+			if(m_aRotTypes[iView] == RotateType_CCW)
+				LOG(INFO) << "| " << iView << "\t| CCW              |";
+			else if(m_aRotTypes[iView] == RotateType_CW)
+				LOG(INFO) << "| " << iView << "\t| CW               |";
+			else
+				LOG(INFO) << "| " << iView << "\t| No face detected |";
+		}
+		LOG(INFO) << "----------------------------";
+
+	}
+
+
 };
 
 
