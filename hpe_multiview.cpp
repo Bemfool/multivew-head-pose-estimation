@@ -9,7 +9,6 @@
 
 namespace fs = boost::filesystem;
 namespace po = boost::program_options;
-using namespace std;
 
 
 int main(int argc, char* argv[])
@@ -34,16 +33,16 @@ int main(int argc, char* argv[])
 
     opts.add_options()
         ("project_path", po::value<string>(&projectPath)->default_value(
-            R"(/media/keith/SAKURA/face_zzm/project)"), 
+            R"(./data/project)"), 
             "Folder containing images and camera information.")
         ("bfm_h5_path", po::value<string>(&bfmH5Path)->default_value(
-            R"(/home/keith/Data/BaselFaceModel_mod.h5)"), 
+            R"(./data/BaselFaceModel_mod.h5)"), 
             "Path of Basel Face Model.")
         ("landmark_idx_path", po::value<string>(&landmarkIdxPath)->default_value(
-            R"(/home/keith/Project/head-pose-estimation/data/example_landmark_68.anl)"), 
+            R"(./data/example_landmark_68.anl)"), 
             "Path of corresponding between dlib and model vertex index.")
         ("dlib_landmark_det_path", po::value<string>(&dlibLandmarkDetPath)->default_value(
-            R"(/home/keith/Data/shape_predictor_68_face_landmarks.dat)"), 
+            R"(./data/shape_predictor_68_face_landmarks.dat)"), 
             "Path of shape_predictor_68_face_landmarks.dat.")
         ("help,h", "Help message");
     

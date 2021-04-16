@@ -11,7 +11,7 @@
 using Eigen::Dynamic;
 using Eigen::Map;
 using Eigen::Matrix;
-
+template<typename _Tp> using VectorX = Eigen::Matrix<_Tp, Eigen::Dynamic, 1>;
 
 class PointReprojErr {
 public:                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
@@ -36,31 +36,22 @@ public:
 		cx = static_cast<_Tp>(m_pBfmManager->getCx());
 		cy = static_cast<_Tp>(m_pBfmManager->getCy());
 
-		LOG(INFO) << "Int: " << fx << " " << fy << " " << cx << " " << cy;
-		LOG(INFO) << "Size: " << len;
-		
 		// Fetch camera matrix array
 		const auto& aMatCams = m_pDataManager->getCameraMatrices();
-		// const auto& mapLandmarkIndices = m_pBfmManager->getMapLandmarkIndices();
+		const auto& vLandmarkMaps = m_pBfmManager->getMapLandmarkIndices();
 
-		Eigen::Matrix<_Tp, Eigen::Dynamic, 1> vecPtsMC;
-        vecPtsMC.resize(204);
-        for(auto i = 0; i < 204; i++)
-		{
+		VectorX<_Tp> vecPtsMC;
+
+        vecPtsMC.resize(N_LANDMARKS * 3);
+        for(auto i = 0; i < N_LANDMARKS * 3; ++i)
             vecPtsMC(i) = aPoints[i];
-		}
-		LOG(INFO) << vecPtsMC;
 
 		// Compute Euler Distance between landmark and transformed model points in every photos
 		for(auto i = 0u; i < len; ++i)
 		{
 			iView = m_aObjDetections[i].second;
 
-			LOG(INFO) << "View: " << iView;
-
  			const Matrix<_Tp, 4, 4> matCam = aMatCams[iView].template cast<_Tp>();
-
-			LOG(INFO) << matCam;
 
 			const auto vecPtsWC = bfm_utils::TransPoints(matCam, vecPtsMC);
 			for(auto j = 0u; j < N_LANDMARKS; ++j) 
@@ -70,12 +61,8 @@ public:
 				v = fy * vecPtsWC(j * 3 + 1) * invZ + cy;
 				aResiduals[i * N_LANDMARKS * 2 + j * 2] = static_cast<_Tp>(m_aObjDetections[i].first.part(j).x()) - u;
 				aResiduals[i * N_LANDMARKS * 2 + j * 2 + 1] = static_cast<_Tp>(m_aObjDetections[i].first.part(j).y()) - v;
-			
-				LOG(INFO) << "uv" << u << v;
-				LOG(INFO) << "expect:" << m_aObjDetections[i].first.part(j).x() << " " << m_aObjDetections[i].first.part(j).y();
 			}
 
-			std::cin.get();
 		}
 
 		// Empty residuals

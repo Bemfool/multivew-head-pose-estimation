@@ -18,6 +18,7 @@ namespace tiny_progress
 
         void begin(std::ostream& os, std::string sMsg) 
         {
+            m_f = std::ios::fmtflags(os.flags());
             m_nCurTasks = 0;
             m_sMsg = sMsg;
             m_t = std::thread(load, std::ref(os), std::ref(m_sMsg), std::ref(m_nCurTasks), m_nBarWidth, m_nTasks, m_sLoadSymbol);
@@ -55,6 +56,7 @@ namespace tiny_progress
                 os << "[WARNING] Code not completed.\n";
                 os.flush();
             }
+            os.flags(m_f);
         }
         
 
@@ -81,6 +83,7 @@ namespace tiny_progress
             }
         }
 
+        std::ios::fmtflags m_f;
         std::thread m_t;
         unsigned int m_nTasks;
         unsigned int m_nCurTasks;

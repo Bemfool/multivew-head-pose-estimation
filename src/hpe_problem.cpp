@@ -48,8 +48,8 @@ void MHPEProblem::solve(SolveExtParamsMode mode)
 {
 	LOG(INFO) << "Begin solving multi-view head pose estimation.";
 
-	// const auto& nViews = m_pDataManager->getNViews();
-	auto nViews = 5;
+	const auto& nViews = m_pDataManager->getNViews();
+	// auto nViews = 5;
 
 	const auto& aRotTypes = m_pDataManager->getRotTypes();
 	const auto& a2dImgs = m_pDataManager->getArr2dImgs();
@@ -447,16 +447,43 @@ std::vector<double> MHPEProblem::estInit3dPts(const std::vector<DetPair>& vDetPa
 	ceres::Solver::Summary summary;	
 
 	std::vector<double> vPts(m_pBfmManager->getNLandmarks() * 3, 0.0);
-
+	// double* vPts = new double[m_pBfmManager->getNLandmarks() * 3] { 0.0 };
 	mhpe::Utils::InitCeresProblem(std::ref(options));
 
 	problem.AddResidualBlock(costFunction, nullptr, vPts.data());
 	ceres::Solve(options, &problem, &summary);
 	LOG(INFO) << summary.BriefReport();
 
-	for(auto i : vPts)
-		std::cout << " " << i;
-	std::cout << std::endl;
+	std::ofstream out;
+	/* Note: In Linux Cpp, we should use std::ios::out as flag, which is not necessary in Windows */
+	out.open("test_initial_landmarks", std::ios::out | std::ios::binary);
+	if(!out.is_open()) 
+	{
+		LOG(ERROR) << "Creation of failed.";
+	}
+
+	out << "ply\n";
+	out << "format binary_little_endian 1.0\n";
+	out << "comment Made from the 3D Morphable Face Model of the Univeristy of Basel, Switzerland.\n";
+	out << "element vertex 68\n";
+	out << "property float x\n";
+	out << "property float y\n";
+	out << "property float z\n";
+	out << "end_header\n";
+
+	int cnt = 0;
+	for (int i = 0; i < 68; i++) 
+	{
+		float x, y, z;
+		x = float(vPts[i * 3]);
+		y = float(vPts[i * 3 + 1]);
+		z = float(vPts[i * 3 + 2]);
+		out.write((char *)&x, sizeof(x));
+		out.write((char *)&y, sizeof(y));
+		out.write((char *)&z, sizeof(z));
+	}
+
+	out.close();	
 
 	return vPts;
 }

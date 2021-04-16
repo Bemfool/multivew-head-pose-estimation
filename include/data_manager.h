@@ -385,12 +385,12 @@ private:
 		};
 	
 		tiny_progress::ProgressBar pb(m_nViews);
-		pb.begin(std::ref(std::cout), " Loading.");
+		// pb.begin(std::ref(std::cout), " Loading.");
 		for(auto iView = 0; iView < m_nViews; ++iView)
 		{
 			const Texture& tex = m_aTextures[iView];
 			const std::string &sTexPath = tex.getPath();
-			pb.update(1, "Detecting " + sTexPath);
+			// pb.update(1, "Detecting " + sTexPath);
 
 			if(m_aRotTypes[iView] == RotateType_Invalid)
 				continue;
@@ -442,7 +442,7 @@ private:
 
 			m_aDets[iView] = objDet;
 		}
-		pb.end(std::ref(std::cout), "Detection done.");
+		// pb.end(std::ref(std::cout), "Detection done.");
 
 		LOG(INFO) << "Detection result:";
 		LOG(INFO) << "----------------------------";
