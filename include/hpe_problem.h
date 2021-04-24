@@ -14,6 +14,7 @@
 #include <fstream>
 #include <assert.h>
 #include <memory>
+#include <chrono>
 
 #include "ceres/ceres.h"
 
@@ -69,30 +70,22 @@ public:
 		const std::string& sDlibDetPath
 	);
 
-	// inline BfmManager *getModel() { return m_pBfmManager; }
 	inline std::shared_ptr<BfmManager>& getBfmManager() { return m_pBfmManager; }
 
 	void solve(SolveExtParamsMode mode);
-	
-	Summary estExtParams(const DetPairVector&  aObjDets);
-	// Summary estShapeCoef(const DetPairVector&  aObjDets);
-	// Summary estExprCoef(const DetPairVector&  aObjDets);
-	
-	bool solveExtParams(long mode = SolveExtParamsMode_UseCeres, double ca = 1.0, double cb = 0.0);
-
-	bool solveShapeCoef();
-
-
-	bool solveExprCoef();
 
 
 private:
+
 
 	bool is_close_enough(double *ext_params, double rotation_eps = 0, double translation_eps = 0);
 
 	std::vector<double> estInit3dPts(const std::vector<DetPair>& vDetPairs);
 	void estInitSc(const std::vector<double>& vPts);
 	void estInitExtParams(std::vector<double>& vPts);
+	Summary estExtParams(const DetPairVector&  aObjDets);
+	Summary estShapeCoef(const DetPairVector&  aObjDets);
+	Summary estExprCoef(const DetPairVector&  aObjDets);
 	void initWin(
 		dlib::image_window& window, 
 		const std::string& sTitle, 
@@ -101,6 +94,7 @@ private:
 		bool bIsValid
 	);
 	void rmOutliers();
+	void showRes();
 
 	shared_ptr<BfmManager> m_pBfmManager;
 	shared_ptr<DataManager> m_pDataManager;

@@ -47,9 +47,9 @@ Status MHPEProblem::init(
 void MHPEProblem::solve(SolveExtParamsMode mode)
 {
 	LOG(INFO) << "Begin solving multi-view head pose estimation.";
+	auto start = std::chrono::system_clock::now();    // Start of solving 
 
 	const auto& nViews = m_pDataManager->getNViews();
-	// auto nViews = 5;
 
 	const auto& aRotTypes = m_pDataManager->getRotTypes();
 	const auto& a2dImgs = m_pDataManager->getArr2dImgs();
@@ -61,6 +61,7 @@ void MHPEProblem::solve(SolveExtParamsMode mode)
 	std::vector<DetPair> aDetPairs;
 	std::vector<double> vInitPts;
 	std::vector<dlib::image_window> winOrigin(nViews), winTrans(nViews);
+	bool isConvergence;
 
 	this->rmOutliers();
 
@@ -100,18 +101,18 @@ void MHPEProblem::solve(SolveExtParamsMode mode)
 	this->estInitSc(vInitPts);
 	this->estInitExtParams(vInitPts);
 
-	bool isConvergence;
 	Summary sum;
 	do {
 		isConvergence = true;
 		sum = this->estExtParams(aDetPairs);
 		isConvergence &= (sum.initial_cost - sum.final_cost < 1e2);
-		// sum = this->estShapeCoef(aDetPairs);
-		// isConvergence &= (sum.initial_cost - sum.final_cost < 1e2);
-		// sum = this->estExprCoef(aDetPairs);
-		// isConvergence &= (sum.initial_cost - sum.final_cost < 1e2);
+		sum = this->estShapeCoef(aDetPairs);
+		isConvergence &= (sum.initial_cost - sum.final_cost < 1e2);
+		sum = this->estExprCoef(aDetPairs);
+		isConvergence &= (sum.initial_cost - sum.final_cost < 1e2);
 	} while(!isConvergence);
 	
+	this->showRes();
 
 	// BFM_DEBUG(PRINT_YELLOW "\n[Step 4] Show results.\n" COLOR_END);
 	// float pfExtParams[N_EXT_PARAMS];
@@ -166,6 +167,12 @@ void MHPEProblem::solve(SolveExtParamsMode mode)
 	m_pBfmManager->writePly("face_ext_shape.ply", ModelWriteMode_CameraCoord);
 	// m_pBfmManager->writePly("avg.ply");
 
+    auto end = std::chrono::system_clock::now();    // End of solving
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    LOG(INFO) << "Cost of solution: "
+        << (double(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den)
+        << " seconds." << std::endl;            
+
 	std::cin.get();
 }
 
@@ -217,52 +224,58 @@ Summary MHPEProblem::estExtParams(const DetPairVector& aObjDets)
 	return summary;
 }
 
-// Summary MHPEProblem::estShapeCoef(const DetPairVector& aObjDets) 
-// {
-// 	LOG(INFO) << "Estimate Multi-Faces Shape Coefficients" << std::endl;
+Summary MHPEProblem::estShapeCoef(const DetPairVector& aObjDets) 
+{
+	LOG(INFO) << "Estimate Multi-Faces Shape Coefficients" << std::endl;
 
-// 	double *pShapeCoef;
-// 	ceres::Problem problem;
-// 	ceres::CostFunction *costFunction;
-// 	CERES_INIT(N_CERES_ITERATIONS, N_CERES_THREADS, B_CERES_STDCOUT);
+	double *pShapeCoef;
+	ceres::Problem problem;	
+	ceres::CostFunction *costFunction;
+	ceres::Solver::Options options;
+	ceres::Solver::Summary summary;
 
-// 	pShapeCoef = m_pBfmManager->getMutableShapeCoef();
+	mhpe::Utils::InitCeresProblem(std::ref(options));
+
+	pShapeCoef = m_pBfmManager->getMutableShapeCoef();
 	
-// 	costFunction = MultiShapeCoefReprojErr::create(aObjDets, m_pBfmManager.get(), m_pDataManager.get());
-// 	problem.AddResidualBlock(costFunction, nullptr, pShapeCoef);
-// 	ceres::Solve(options, &problem, &summary);
+	costFunction = MultiShapeCoefReprojErr::create(aObjDets, m_pBfmManager.get(), m_pDataManager.get());
+	problem.AddResidualBlock(costFunction, nullptr, pShapeCoef);
+	ceres::Solve(options, &problem, &summary);
 
-// 	LOG(INFO) << summary.BriefReport() << std::endl;
+	LOG(INFO) << summary.BriefReport() << std::endl;
  
-// 	// Sync	result
-// 	m_pBfmManager->genLandmarkBlendshape();
+	// Sync	result
+	m_pBfmManager->genLandmarkBlendshape();
 
-// 	return summary;
-// }
+	return summary;
+}
 
 
-// Summary MHPEProblem::estExprCoef(const DetPairVector& aObjDets) 
-// {
-// 	LOG(INFO) << "Estimate Multi-Faces Expression Coefficients" << std::endl;
+Summary MHPEProblem::estExprCoef(const DetPairVector& aObjDets) 
+{
+	LOG(INFO) << "Estimate Multi-Faces Expression Coefficients" << std::endl;
 
-// 	double *pExprCoef;
-// 	ceres::Problem problem;
-// 	ceres::CostFunction *costFunction;
-// 	CERES_INIT(N_CERES_ITERATIONS, N_CERES_THREADS, B_CERES_STDCOUT);
+	double *pExprCoef;
+	ceres::Problem problem;	
+	ceres::CostFunction *costFunction;
+	ceres::Solver::Options options;
+	ceres::Solver::Summary summary;
+
+	mhpe::Utils::InitCeresProblem(std::ref(options));
 	
-// 	pExprCoef = m_pBfmManager->getMutableExprCoef();
+	pExprCoef = m_pBfmManager->getMutableExprCoef();
 
-// 	costFunction = MultiExprCoefReprojErr::create(aObjDets, m_pBfmManager.get(), m_pDataManager.get());
-// 	problem.AddResidualBlock(costFunction, nullptr, pExprCoef);
-// 	ceres::Solve(options, &problem, &summary);
+	costFunction = MultiExprCoefReprojErr::create(aObjDets, m_pBfmManager.get(), m_pDataManager.get());
+	problem.AddResidualBlock(costFunction, nullptr, pExprCoef);
+	ceres::Solve(options, &problem, &summary);
 
-// 	LOG(INFO) << summary.BriefReport() << std::endl;
+	LOG(INFO) << summary.BriefReport() << std::endl;
 
-// 	// Sync	result
-// 	m_pBfmManager->genLandmarkBlendshape();
+	// Sync	result
+	m_pBfmManager->genLandmarkBlendshape();
 
-// 	return summary;
-// }
+	return summary;
+}
 
 
 // bool MHPEProblem::solveExtParams(long mode, double ca, double cb) 
@@ -447,43 +460,11 @@ std::vector<double> MHPEProblem::estInit3dPts(const std::vector<DetPair>& vDetPa
 	ceres::Solver::Summary summary;	
 
 	std::vector<double> vPts(m_pBfmManager->getNLandmarks() * 3, 0.0);
-	// double* vPts = new double[m_pBfmManager->getNLandmarks() * 3] { 0.0 };
 	mhpe::Utils::InitCeresProblem(std::ref(options));
 
 	problem.AddResidualBlock(costFunction, nullptr, vPts.data());
 	ceres::Solve(options, &problem, &summary);
-	LOG(INFO) << summary.BriefReport();
-
-	std::ofstream out;
-	/* Note: In Linux Cpp, we should use std::ios::out as flag, which is not necessary in Windows */
-	out.open("test_initial_landmarks", std::ios::out | std::ios::binary);
-	if(!out.is_open()) 
-	{
-		LOG(ERROR) << "Creation of failed.";
-	}
-
-	out << "ply\n";
-	out << "format binary_little_endian 1.0\n";
-	out << "comment Made from the 3D Morphable Face Model of the Univeristy of Basel, Switzerland.\n";
-	out << "element vertex 68\n";
-	out << "property float x\n";
-	out << "property float y\n";
-	out << "property float z\n";
-	out << "end_header\n";
-
-	int cnt = 0;
-	for (int i = 0; i < 68; i++) 
-	{
-		float x, y, z;
-		x = float(vPts[i * 3]);
-		y = float(vPts[i * 3 + 1]);
-		z = float(vPts[i * 3 + 2]);
-		out.write((char *)&x, sizeof(x));
-		out.write((char *)&y, sizeof(y));
-		out.write((char *)&z, sizeof(z));
-	}
-
-	out.close();	
+	LOG(INFO) << summary.BriefReport();	
 
 	return vPts;
 }
@@ -569,6 +550,7 @@ void MHPEProblem::rmOutliers()
 			|| iView == 2
 			|| iView == 3
 			|| iView == 9
+			|| iView == 7 // 倒着的脸也能检测出特征点
 			|| iView == 11
 			|| iView == 13
 			|| iView == 19
@@ -576,5 +558,22 @@ void MHPEProblem::rmOutliers()
 			|| iView == 22
 			|| iView == 23)
 			aRotTypes[iView] = RotateType_Invalid;
+	}
+}
+
+void MHPEProblem::showRes(std::vector<dlib::image_window>& vWins)
+{
+	const auto& nViews = m_pDataManager->getNViews();
+	auto& aRotTypes = m_pDataManager->getRotTypes();
+	const auto& aMatCams = m_pDataManager->getCameraMatrices();
+	auto vPts = m_pBfmManager->getLandmarkCurrentBlendshapeTransformed()
+			  .template cast<float>()
+			  * static_cast<float>(m_pBfmManager->getMutableScale());
+
+	for(auto iView = 0; iView < nViews; ++iView)
+	{
+		if(aRotTypes[iView] == RotateType_Invalid)
+			continue;
+		Eigen::VectorXf vTranPts = bfm_utils::TransPoints(aMatCams[iView], vPts);
 	}
 }

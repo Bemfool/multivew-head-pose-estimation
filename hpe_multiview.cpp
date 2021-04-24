@@ -1,7 +1,6 @@
 #include "hpe_problem.h"
 
 #include <iostream>
-#include <chrono>
 #include <memory>
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
@@ -73,13 +72,7 @@ int main(int argc, char* argv[])
 	std::unique_ptr<MHPEProblem> pHpeProblem(new MHPEProblem(projectPath, bfmH5Path, landmarkIdxPath, dlibLandmarkDetPath));
 	std::shared_ptr<BfmManager>& pBfmManager = pHpeProblem->getBfmManager();
 
-    auto start = std::chrono::system_clock::now();    // Start of solving 
     pHpeProblem->solve(SolveExtParamsMode_Default);
-    auto end = std::chrono::system_clock::now();    // End of solving
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    LOG(INFO) << "Cost of solution: "
-        << (double(duration.count()) * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den)
-        << " seconds." << std::endl;            
 
     // Show results 
     pBfmManager->printExtParams();
