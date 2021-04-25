@@ -19,7 +19,7 @@
 #include <dlib/image_processing/render_face_detections.h>
 #include <dlib/image_processing.h>
 
-#include "tbb/tbb.h"
+#include "oneapi/tbb.h"
 
 #include "glog/logging.h"
 
@@ -366,12 +366,15 @@ private:
 		// }
 		// pb.end(std::ref(std::cout), "Load texture done.");
 
-		tbb::strict_ppl::parallel_for(
-			0u, m_nViews, 1u,
-			[&](std::size_t iFace)
+		tbb::parallel_for(
+			tbb::blocked_range<std::size_t>(0, m_nViews),
+			[&](const tbb::blocked_range<std::size_t>& r)
 			{
-				path pathTexture = m_pathPhotoDir / (file_utils::Id2Str(iFace) + ".jpg");
-				m_aTextures[iFace] = Texture::LoadTexture(pathTexture.string());
+				for(std::size_t i = r.begin(); i != r.end(); ++i)
+				{
+					path pathTexture = m_pathPhotoDir / (file_utils::Id2Str(i) + ".jpg");
+					m_aTextures[i] = Texture::LoadTexture(pathTexture.string());
+				}
 			}
 		);
 
