@@ -112,7 +112,7 @@ void MHPEProblem::solve(SolveExtParamsMode mode)
 		isConvergence &= (sum.initial_cost - sum.final_cost < 1e2);
 	} while(!isConvergence);
 	
-	this->showRes();
+	this->showRes(winOrigin);
 
 	// BFM_DEBUG(PRINT_YELLOW "\n[Step 4] Show results.\n" COLOR_END);
 	// float pfExtParams[N_EXT_PARAMS];
@@ -566,9 +566,9 @@ void MHPEProblem::showRes(std::vector<dlib::image_window>& vWins)
 	const auto& nViews = m_pDataManager->getNViews();
 	auto& aRotTypes = m_pDataManager->getRotTypes();
 	const auto& aMatCams = m_pDataManager->getCameraMatrices();
-	auto vPts = m_pBfmManager->getLandmarkCurrentBlendshapeTransformed()
-			  .template cast<float>()
-			  * static_cast<float>(m_pBfmManager->getMutableScale());
+	Eigen::Matrix<float, Dynamic, 1> vPts = m_pBfmManager->getLandmarkCurrentBlendshapeTransformed()
+			  							  .template cast<float>()
+			  							  * static_cast<float>(m_pBfmManager->getMutableScale());
 
 	for(auto iView = 0; iView < nViews; ++iView)
 	{

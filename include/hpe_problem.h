@@ -34,11 +34,6 @@ using Eigen::Vector3d;
 using Eigen::VectorXd;
 using Summary = ceres::Solver::Summary;
 
-#define CERES_INIT(options, N_ITERATIONS, N_THREADS, B_STDCOUT) \
-		options.max_num_iterations = N_ITERATIONS; \
- 		options.num_threads = N_THREADS; \
-		options.minimizer_progress_to_stdout = B_STDCOUT; 
-
 
 class MHPEProblem
 {
@@ -94,12 +89,10 @@ private:
 		bool bIsValid
 	);
 	void rmOutliers();
-	void showRes();
+	void showRes(std::vector<dlib::image_window>& vWins);
 
 	shared_ptr<BfmManager> m_pBfmManager;
 	shared_ptr<DataManager> m_pDataManager;
-
-	std::vector<unsigned int> m_aLandmarkMap;
 };
 
 

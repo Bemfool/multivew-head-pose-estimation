@@ -19,6 +19,8 @@
 #include <dlib/image_processing/render_face_detections.h>
 #include <dlib/image_processing.h>
 
+#include "tbb/tbb.h"
+
 #include "glog/logging.h"
 
 #include <fstream>
@@ -353,16 +355,26 @@ private:
 		LOG(INFO) << "Load textures";
 
 		m_aTextures.resize(m_nViews);
-		tiny_progress::ProgressBar pb(m_nViews);
-		pb.begin(std::ref(std::cout), "Loading.");
-		for (auto iFace = 0; iFace < m_nViews; iFace++)
-		{
-			path pathTexture = m_pathPhotoDir / (file_utils::Id2Str(iFace) + ".jpg");
-			pb.update(1, "Loading " + pathTexture.filename().string());
+		// tiny_progress::ProgressBar pb(m_nViews);
+		// pb.begin(std::ref(std::cout), "Loading.");
+		// for (auto iFace = 0; iFace < m_nViews; iFace++)
+		// {
+		// 	path pathTexture = m_pathPhotoDir / (file_utils::Id2Str(iFace) + ".jpg");
+		// 	pb.update(1, "Loading " + pathTexture.filename().string());
 
-			m_aTextures[iFace] = Texture::LoadTexture(pathTexture.string());
-		}
-		pb.end(std::ref(std::cout), "Load texture done.");
+		// 	m_aTextures[iFace] = Texture::LoadTexture(pathTexture.string());
+		// }
+		// pb.end(std::ref(std::cout), "Load texture done.");
+
+		tbb::strict_ppl::parallel_for(
+			0u, m_nViews, 1u,
+			[&](std::size_t iFace)
+			{
+				path pathTexture = m_pathPhotoDir / (file_utils::Id2Str(iFace) + ".jpg");
+				m_aTextures[iFace] = Texture::LoadTexture(pathTexture.string());
+			}
+		);
+
 		return Status_Ok;
 	}
 
