@@ -19,8 +19,6 @@
 #include <dlib/image_processing/render_face_detections.h>
 #include <dlib/image_processing.h>
 
-#include "oneapi/tbb.h"
-
 #include "glog/logging.h"
 
 #include <fstream>
@@ -355,28 +353,13 @@ private:
 		LOG(INFO) << "Load textures";
 
 		m_aTextures.resize(m_nViews);
-		// tiny_progress::ProgressBar pb(m_nViews);
-		// pb.begin(std::ref(std::cout), "Loading.");
-		// for (auto iFace = 0; iFace < m_nViews; iFace++)
-		// {
-		// 	path pathTexture = m_pathPhotoDir / (file_utils::Id2Str(iFace) + ".jpg");
-		// 	pb.update(1, "Loading " + pathTexture.filename().string());
 
-		// 	m_aTextures[iFace] = Texture::LoadTexture(pathTexture.string());
-		// }
-		// pb.end(std::ref(std::cout), "Load texture done.");
-
-		tbb::parallel_for(
-			tbb::blocked_range<std::size_t>(0, m_nViews),
-			[&](const tbb::blocked_range<std::size_t>& r)
-			{
-				for(std::size_t i = r.begin(); i != r.end(); ++i)
-				{
-					path pathTexture = m_pathPhotoDir / (file_utils::Id2Str(i) + ".jpg");
-					m_aTextures[i] = Texture::LoadTexture(pathTexture.string());
-				}
-			}
-		);
+		#pragma omp parallel for schedule(dynamic)
+		for(std::size_t i = 0; i < m_nViews; ++i)
+		{
+			path pathTexture = m_pathPhotoDir / (file_utils::Id2Str(i) + ".jpg");
+			m_aTextures[i] = Texture::LoadTexture(pathTexture.string());
+		}
 
 		return Status_Ok;
 	}
@@ -398,14 +381,12 @@ private:
 			RotateType_CCW, RotateType_CCW, RotateType_CCW, RotateType_CCW, RotateType_Invalid,
 			RotateType_Invalid, RotateType_CW, RotateType_Invalid, RotateType_Invalid
 		};
-	
-		tiny_progress::ProgressBar pb(m_nViews);
-		// pb.begin(std::ref(std::cout), " Loading.");
-		for(auto iView = 0; iView < m_nViews; ++iView)
+
+		#pragma omp parallel for
+		for(std::size_t iView = 0; iView < m_nViews; ++iView)
 		{
 			const Texture& tex = m_aTextures[iView];
 			const std::string &sTexPath = tex.getPath();
-			// pb.update(1, "Detecting " + sTexPath);
 
 			if(m_aRotTypes[iView] == RotateType_Invalid)
 				continue;
@@ -416,7 +397,12 @@ private:
 			dlib::resize_image(m_dZoomSc, m_a2dImgs[iView]);
 
 			dlib::rotate_image(m_a2dImgs[iView], m_a2dTransImgs[iView], M_PI * 0.5);
-			aRecs = m_faceDetector(m_a2dTransImgs[iView]);
+
+			#pragma omp critical(detector)
+			{
+				aRecs = m_faceDetector(m_a2dTransImgs[iView]);
+			}
+
 			if(aRecs.size() == 0)
 			{
 				dlib::rotate_image(m_a2dImgs[iView], m_a2dTransImgs[iView], M_PI * 1.5);
@@ -427,19 +413,16 @@ private:
 					continue;
 				}
 				else
-				{
 					m_aRotTypes[iView] = RotateType_CW;
-				}
 			}
 			else
-			{
 				m_aRotTypes[iView] = RotateType_CCW;
-			}
 
 		
 			ObjDet objDet = m_shapePredictor(m_a2dTransImgs[iView], aRecs[0]);
 			m_aTransDets[iView] = objDet;
 
+			#pragma omp parallel for
 			for(auto j = 0; j < N_DLIB_LANDMARKS; j++)
 			{
 				auto x = objDet.part(j).x(), y = objDet.part(j).y();
@@ -457,7 +440,6 @@ private:
 
 			m_aDets[iView] = objDet;
 		}
-		// pb.end(std::ref(std::cout), "Detection done.");
 
 		LOG(INFO) << "Detection result:";
 		LOG(INFO) << "----------------------------";
