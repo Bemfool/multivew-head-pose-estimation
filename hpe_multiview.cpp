@@ -29,6 +29,7 @@ int main(int argc, char* argv[])
 
     string projectPath, bfmH5Path;
     string landmarkIdxPath, dlibLandmarkDetPath;
+    double dShapeWeight, dExprWeight;
 
     opts.add_options()
         ("project_path", po::value<string>(&projectPath)->default_value(
@@ -43,6 +44,8 @@ int main(int argc, char* argv[])
         ("dlib_landmark_det_path", po::value<string>(&dlibLandmarkDetPath)->default_value(
             R"(./data/shape_predictor_68_face_landmarks.dat)"), 
             "Path of shape_predictor_68_face_landmarks.dat.")
+        ("shape", po::value<double>(&dShapeWeight)->default_value(10.0), "Weight of shape regular term")        
+        ("expr", po::value<double>(&dExprWeight)->default_value(0.001), "Weight of expression regular term")   
         ("help,h", "Help message");
     
     try
@@ -72,7 +75,7 @@ int main(int argc, char* argv[])
 	std::unique_ptr<MHPEProblem> pHpeProblem(new MHPEProblem(projectPath, bfmH5Path, landmarkIdxPath, dlibLandmarkDetPath));
 	std::shared_ptr<BfmManager>& pBfmManager = pHpeProblem->getBfmManager();
 
-    pHpeProblem->solve(SolveExtParamsMode_Default);
+    pHpeProblem->solve(SolveExtParamsMode_Default, dShapeWeight, dExprWeight);
 
     // Show results 
     pBfmManager->printExtParams();

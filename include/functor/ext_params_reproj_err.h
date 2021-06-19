@@ -18,11 +18,14 @@ public:
 	MultiExtParamsReprojErr(
 		const std::vector<std::pair<FullObjectDetection, int>> &aObjDetections, 
 		BfmManager *model, 
-		DataManager* pDataManager) : 
+		DataManager* pDataManager,
+		double scMean) : 
 		m_aObjDetections(aObjDetections), 
 	    m_pModel(model), 
-		m_pDataManager(pDataManager) { }
+		m_pDataManager(pDataManager),
+		m_scMean(scMean) { }
 	
+
     template<typename _Tp>
 	bool operator () (const _Tp* const pExtParams, const _Tp* const pScale, _Tp* aResiduals) const 
 	{
@@ -75,10 +78,14 @@ public:
 		return true;
 	}
 
-	static ceres::CostFunction *create(const std::vector<std::pair<dlib::full_object_detection, int>> &aObjDetections, BfmManager *model, DataManager* pDataManager) 
+	static ceres::CostFunction *create(
+		const std::vector<std::pair<dlib::full_object_detection, int>> &aObjDetections, 
+		BfmManager *model, 
+		DataManager* pDataManager,
+		double scMean) 
 	{
 		return (new ceres::AutoDiffCostFunction<MultiExtParamsReprojErr, N_LANDMARKS * 2 * N_PHOTOS + 1, N_EXT_PARAMS, 1>(
-			new MultiExtParamsReprojErr(aObjDetections, model, pDataManager)));
+			new MultiExtParamsReprojErr(aObjDetections, model, pDataManager, scMean)));
 	}
 
 private:
@@ -86,7 +93,7 @@ private:
     BfmManager *m_pModel;
 	DataManager* m_pDataManager;
 	double m_scWeight = 1e6;
-	double m_scMean = 0.0075;
+	double m_scMean = 0.0;
 };
 
 

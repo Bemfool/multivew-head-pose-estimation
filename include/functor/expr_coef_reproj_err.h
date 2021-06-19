@@ -17,10 +17,12 @@ public:
 	MultiExprCoefReprojErr(
 		const DetPairVector &aObjDetections, 
 		BfmManager *model, 
-		DataManager* pDataManager) : 
+		DataManager* pDataManager,
+		double dWeight = 0.001) : 
 		m_aObjDetections(aObjDetections), 
 		m_pModel(model), 
-		m_pDataManager(pDataManager) { }
+		m_pDataManager(pDataManager),
+		m_dWeight(dWeight) { }
 	
     template<typename _Tp>
 	bool operator () (const _Tp* const aExprCoef, _Tp* aResiduals) const {
@@ -85,10 +87,11 @@ public:
 	static CostFunction *create(
 		const DetPairVector &aObjDetections, 
 		BfmManager* model, 
-		DataManager* pDataManager) 
+		DataManager* pDataManager,
+		double dWeight = 0.001) 
 	{
 		return (new AutoDiffCostFunction<MultiExprCoefReprojErr, N_RES + N_EXPR_PCS, N_EXPR_PCS>(
-			new MultiExprCoefReprojErr(aObjDetections, model, pDataManager)));
+			new MultiExprCoefReprojErr(aObjDetections, model, pDataManager, dWeight)));
 	}
 
 private:
@@ -96,7 +99,7 @@ private:
     BfmManager *m_pModel;
 	DataManager* m_pDataManager;
 	double* m_pExtParams;
-	double m_dWeight = 0.001;
+	double m_dWeight;
 };
 
 

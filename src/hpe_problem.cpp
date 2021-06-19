@@ -44,7 +44,7 @@ Status MHPEProblem::init(
 }
 
 
-void MHPEProblem::solve(SolveExtParamsMode mode)
+void MHPEProblem::solve(SolveExtParamsMode mode, double dShapeWeight, double dExprWeight)
 {
 	LOG(INFO) << "Begin solving multi-view head pose estimation.";
 	auto start = std::chrono::system_clock::now();    // Start of solving 
@@ -98,70 +98,48 @@ void MHPEProblem::solve(SolveExtParamsMode mode)
 	LOG(INFO) << "Final picked photos include:" << sPickedIdx;
 
 	vInitPts = this->estInit3dPts(aDetPairs);
-	this->estInitSc(vInitPts);
+	double dScMean = this->estInitSc(vInitPts);
 	this->estInitExtParams(vInitPts);
 
 	Summary sum;
 	do {
 		isConvergence = true;
-		sum = this->estExtParams(aDetPairs);
-		isConvergence &= (sum.initial_cost - sum.final_cost < 1e2);
-		sum = this->estShapeCoef(aDetPairs);
-		isConvergence &= (sum.initial_cost - sum.final_cost < 1e2);
-		sum = this->estExprCoef(aDetPairs);
-		isConvergence &= (sum.initial_cost - sum.final_cost < 1e2);
+		sum = this->estExtParams(aDetPairs, dScMean);
+		isConvergence &= (sum.initial_cost - sum.final_cost < 1e2 * aDetPairs.size());
+		sum = this->estShapeCoef(aDetPairs, dShapeWeight);
+		isConvergence &= (sum.initial_cost - sum.final_cost < 1e2 * aDetPairs.size());
+		sum = this->estExprCoef(aDetPairs, dExprWeight);
+		isConvergence &= (sum.initial_cost - sum.final_cost < 1e2 * aDetPairs.size());
 	} while(!isConvergence);
 	
-	this->showRes(winOrigin);
+	// this->showRes(winOrigin);
 
 	// BFM_DEBUG(PRINT_YELLOW "\n[Step 4] Show results.\n" COLOR_END);
-	// float pfExtParams[N_EXT_PARAMS];
-	// for(auto i = 0u; i < N_EXT_PARAMS; ++i) pfExtParams[i] = (float)m_pBfmManager->getMutableExtParams()[i];
-	// Eigen::VectorXf vecPts = m_pBfmManager->getLandmarkCurrentBlendshape().template cast<float>() * (float)m_pBfmManager->getMutableScale();
-	// // Eigen::VectorXf vecPts = m_pBfmManager->getLandmarkCurrentBlendshape().template cast<float>();
-	// for(auto i = 0; i < nViews; i++)
-	// {	
-	// 	if(aRotTypes[i] == RotateType_Invalid) continue;
-
-	// 	Eigen::VectorXf vecTranPts0 = bfm_utils::TransPoints(pfExtParams, vecPts);
-	// 	Eigen::VectorXf vecTranPts1 = bfm_utils::TransPoints(m_pDataManager->getCameraMatrices()[i], vecTranPts0);
-	// 	// Eigen::VectorXf vecTranPts1 = vecTranPts0;
-
-	// 	std::vector<dlib::point> aPoints;
-	// 	for(unsigned int iLandmark = 0; iLandmark < N_LANDMARKS; iLandmark++) 
-	// 	{
-	// 		int u = int(m_pBfmManager->getFx() * vecTranPts1(iLandmark * 3) / vecTranPts1(iLandmark * 3 + 2) + m_pBfmManager->getCx());
-	// 		int v = int(m_pBfmManager->getFy() * vecTranPts1(iLandmark * 3 + 1) / vecTranPts1(iLandmark * 3 + 2) + m_pBfmManager->getCy());
-	// 		aPoints.push_back(dlib::point(u, v));
-	// 		// std::cout << u << " " << v << std::endl;
-	// 	}
-	// 	winOrigin[i].add_overlay(render_face_detections(dlib::full_object_detection(dlib::rectangle(), aPoints), dlib::rgb_pixel(0, 0, 255)));
-	// }
-
-
-	// // INTIAL
-	// for(auto i = START; i < END; i++)
-	// {	
-	// 	if(aRotTypes[i] == RotateType_Invalid) continue;
-
-	// 	Eigen::VectorXf vecTranPts0;
-	// 	vecTranPts0.resize(204);
-	// 	for(auto j = 0; j < 204; j++)
-	// 		vecTranPts0(j) = vPts[j];		
-	// 	Eigen::VectorXf vecTranPts1 = bfm_utils::TransPoints(m_pDataManager->getCameraMatrices()[i], vecTranPts0);
-	// 	// Eigen::VectorXf vecTranPts1 = vecTranPts0;
-
-	// 	std::vector<dlib::point> aPoints;
-	// 	for(unsigned int iLandmark = 0; iLandmark < N_LANDMARKS; iLandmark++) 
-	// 	{
-	// 		int u = int(m_pBfmManager->getFx() * vecTranPts1(iLandmark * 3) / vecTranPts1(iLandmark * 3 + 2) + m_pBfmManager->getCx());
-	// 		int v = int(m_pBfmManager->getFy() * vecTranPts1(iLandmark * 3 + 1) / vecTranPts1(iLandmark * 3 + 2) + m_pBfmManager->getCy());
-	// 		aPoints.push_back(dlib::point(u, v));
-	// 		// std::cout << u << " " << v << std::endl;
-	// 	}
-	// 	winOrigin[i].add_overlay(render_face_detections(dlib::full_object_detection(dlib::rectangle(), aPoints), dlib::rgb_pixel(0, 255, 255)));
-	// }
-
+	float pfExtParams[N_EXT_PARAMS];
+	for(auto i = 0u; i < N_EXT_PARAMS; ++i) pfExtParams[i] = (float)m_pBfmManager->getMutableExtParams()[i];
+	Eigen::VectorXf vecPts = m_pBfmManager->getLandmarkCurrentBlendshape().template cast<float>() * (float)m_pBfmManager->getMutableScale();
+	
+	double totalLoss = 0, loss;
+	for(auto i = 0; i < nViews; i++)
+	{	
+		loss = 0;
+		if(aRotTypes[i] == RotateType_Invalid) continue;
+		Eigen::VectorXf vecTranPts0 = bfm_utils::TransPoints(pfExtParams, vecPts);
+		Eigen::VectorXf vecTranPts1 = bfm_utils::TransPoints(m_pDataManager->getCameraMatrices()[i], vecTranPts0);
+		std::vector<dlib::point> aPoints;
+		for(unsigned int iLandmark = 0; iLandmark < N_LANDMARKS; iLandmark++) 
+		{
+			int u = int(m_pBfmManager->getFx() * vecTranPts1(iLandmark * 3) / vecTranPts1(iLandmark * 3 + 2) + m_pBfmManager->getCx());
+			int v = int(m_pBfmManager->getFy() * vecTranPts1(iLandmark * 3 + 1) / vecTranPts1(iLandmark * 3 + 2) + m_pBfmManager->getCy());
+			aPoints.push_back(dlib::point(u, v));
+			loss += std::pow(aDets[i].part(iLandmark).x() - u, 2) + std::pow(aDets[i].part(iLandmark).y() - v, 2);
+		}
+		LOG(INFO) << "View:\t" << i << "\tMean landmark loss:\t" << std::sqrt(loss / N_DLIB_LANDMARKS); 
+		totalLoss += loss;
+		winOrigin[i].add_overlay(render_face_detections(dlib::full_object_detection(dlib::rectangle(), aPoints), dlib::rgb_pixel(0, 0, 255)));
+	}
+	totalLoss /= aDetPairs.size();
+	LOG(INFO) << "Mean view loss:\t" << totalLoss << "\tTotal mean landmark loss:\t" << std::sqrt(totalLoss / N_DLIB_LANDMARKS);
 
 	m_pBfmManager->genFace();
 	m_pBfmManager->writePly("face_ext_shape.ply", ModelWriteMode_CameraCoord);
@@ -198,7 +176,7 @@ void MHPEProblem::estInitExtParams(vector<double>& vPts)
 }
 
 
-Summary MHPEProblem::estExtParams(const DetPairVector& aObjDets)
+Summary MHPEProblem::estExtParams(const DetPairVector& aObjDets, double scMean)
 {
 	LOG(INFO) << "Estimate Multi-Faces Extrinsic Parameters" << std::endl;
 
@@ -211,7 +189,7 @@ Summary MHPEProblem::estExtParams(const DetPairVector& aObjDets)
 	mhpe::Utils::InitCeresProblem(std::ref(options));
 	std::array<double, N_EXT_PARAMS>& aExtParams = this->m_pBfmManager->getMutableExtParams();
 	
-	costFunction = MultiExtParamsReprojErr::create(aObjDets, m_pBfmManager.get(), m_pDataManager.get());
+	costFunction = MultiExtParamsReprojErr::create(aObjDets, m_pBfmManager.get(), m_pDataManager.get(), scMean);
 	problem.AddResidualBlock(costFunction, nullptr, aExtParams.data(), &dScale);
 	ceres::Solve(options, &problem, &summary);
 	
@@ -224,7 +202,7 @@ Summary MHPEProblem::estExtParams(const DetPairVector& aObjDets)
 	return summary;
 }
 
-Summary MHPEProblem::estShapeCoef(const DetPairVector& aObjDets) 
+Summary MHPEProblem::estShapeCoef(const DetPairVector& aObjDets, double dShapeWeight) 
 {
 	LOG(INFO) << "Estimate Multi-Faces Shape Coefficients" << std::endl;
 
@@ -238,7 +216,7 @@ Summary MHPEProblem::estShapeCoef(const DetPairVector& aObjDets)
 
 	pShapeCoef = m_pBfmManager->getMutableShapeCoef();
 	
-	costFunction = MultiShapeCoefReprojErr::create(aObjDets, m_pBfmManager.get(), m_pDataManager.get());
+	costFunction = MultiShapeCoefReprojErr::create(aObjDets, m_pBfmManager.get(), m_pDataManager.get(), dShapeWeight);
 	problem.AddResidualBlock(costFunction, nullptr, pShapeCoef);
 	ceres::Solve(options, &problem, &summary);
 
@@ -251,7 +229,7 @@ Summary MHPEProblem::estShapeCoef(const DetPairVector& aObjDets)
 }
 
 
-Summary MHPEProblem::estExprCoef(const DetPairVector& aObjDets) 
+Summary MHPEProblem::estExprCoef(const DetPairVector& aObjDets, double dExprWeight) 
 {
 	LOG(INFO) << "Estimate Multi-Faces Expression Coefficients" << std::endl;
 
@@ -265,7 +243,7 @@ Summary MHPEProblem::estExprCoef(const DetPairVector& aObjDets)
 	
 	pExprCoef = m_pBfmManager->getMutableExprCoef();
 
-	costFunction = MultiExprCoefReprojErr::create(aObjDets, m_pBfmManager.get(), m_pDataManager.get());
+	costFunction = MultiExprCoefReprojErr::create(aObjDets, m_pBfmManager.get(), m_pDataManager.get(), dExprWeight);
 	problem.AddResidualBlock(costFunction, nullptr, pExprCoef);
 	ceres::Solve(options, &problem, &summary);
 
@@ -466,11 +444,18 @@ std::vector<double> MHPEProblem::estInit3dPts(const std::vector<DetPair>& vDetPa
 	ceres::Solve(options, &problem, &summary);
 	LOG(INFO) << summary.BriefReport();	
 
+	std::ofstream out("init.off");
+	out << "COFF\n";
+	out << vPts.size() / 3 << " 0 0\n";
+	for(int i = 0; i < vPts.size() / 3; i++)
+		out << vPts[i * 3] << " " << vPts[i * 3 + 1] << " " << vPts[i * 3 + 2] << "\n";
+	out.close();
+
 	return vPts;
 }
 
 
-void MHPEProblem::estInitSc(const std::vector<double>& vPts)
+double MHPEProblem::estInitSc(const std::vector<double>& vPts)
 {
 	LOG(INFO) << "Using intuition to estimate initial scale.";
 
@@ -515,6 +500,7 @@ void MHPEProblem::estInitSc(const std::vector<double>& vPts)
 	initSc = (scHor + scVer) * 0.5;
 
 	LOG(INFO) << "Estimate scale: " << scHor << " " << scVer << " -> " << initSc;
+	return initSc;
 }
 
 
@@ -556,7 +542,11 @@ void MHPEProblem::rmOutliers()
 			|| iView == 19
 			|| iView == 20
 			|| iView == 22
-			|| iView == 23)
+			|| iView == 23
+			|| iView == 4 // tmp
+			|| iView == 21 // tmp
+			|| iView == 18 // tmp
+		)
 			aRotTypes[iView] = RotateType_Invalid;
 	}
 }
@@ -569,11 +559,24 @@ void MHPEProblem::showRes(std::vector<dlib::image_window>& vWins)
 	Eigen::Matrix<float, Dynamic, 1> vPts = m_pBfmManager->getLandmarkCurrentBlendshapeTransformed()
 			  							  .template cast<float>()
 			  							  * static_cast<float>(m_pBfmManager->getMutableScale());
+	auto cx = m_pBfmManager->getCx();
+	auto cy = m_pBfmManager->getCy();
+	auto fx = m_pBfmManager->getFx();
+	auto fy = m_pBfmManager->getFy();
 
 	for(auto iView = 0; iView < nViews; ++iView)
 	{
 		if(aRotTypes[iView] == RotateType_Invalid)
 			continue;
 		Eigen::VectorXf vTranPts = bfm_utils::TransPoints(aMatCams[iView], vPts);
+		std::vector<dlib::point> pts;
+		for(auto j = 0u; j < N_LANDMARKS; j++) 
+		{
+			auto invZ = 1.0 / vTranPts(j * 3 + 2);
+			auto u = fx * vTranPts(j * 3) * invZ + cx;
+			auto v = fy * vTranPts(j * 3 + 1) * invZ + cy;
+			pts.emplace_back(u, v);
+		}
+		vWins[iView].add_overlay(dlib::render_face_detections(ObjDet(dlib::rectangle(), pts), dlib::rgb_pixel(0, 0, 255)));		
 	}
 }

@@ -67,7 +67,7 @@ public:
 
 	inline std::shared_ptr<BfmManager>& getBfmManager() { return m_pBfmManager; }
 
-	void solve(SolveExtParamsMode mode);
+	void solve(SolveExtParamsMode mode, double dShapeWeight, double dExprWeight);
 
 
 private:
@@ -76,11 +76,11 @@ private:
 	bool is_close_enough(double *ext_params, double rotation_eps = 0, double translation_eps = 0);
 
 	std::vector<double> estInit3dPts(const std::vector<DetPair>& vDetPairs);
-	void estInitSc(const std::vector<double>& vPts);
+	double estInitSc(const std::vector<double>& vPts);
 	void estInitExtParams(std::vector<double>& vPts);
-	Summary estExtParams(const DetPairVector&  aObjDets);
-	Summary estShapeCoef(const DetPairVector&  aObjDets);
-	Summary estExprCoef(const DetPairVector&  aObjDets);
+	Summary estExtParams(const DetPairVector&  aObjDets, double scMean);
+	Summary estShapeCoef(const DetPairVector&  aObjDets, double dShapeWeight);
+	Summary estExprCoef(const DetPairVector&  aObjDets, double dExprWeight);
 	void initWin(
 		dlib::image_window& window, 
 		const std::string& sTitle, 

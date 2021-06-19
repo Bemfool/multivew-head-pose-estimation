@@ -27,13 +27,20 @@ public:
 	static Texture LoadTexture(const std::string path)
 	{
 		int width = -1, height = -1, nrComponents;
-		unsigned char *data = stbi_load(path.c_str(), &width, &height, &nrComponents, 0);
+		unsigned char *data = stbi_load((path + ".jpg").c_str(), &width, &height, &nrComponents, 0);
 		if (!data)
 		{
-			LOG(ERROR) << "Texture failed to load at path: " << path;
+			LOG(WARNING) << "Texture failed to load at path: " << path;
+			stbi_image_free(data);
+			data = stbi_load((path + ".JPG").c_str(), &width, &height, &nrComponents, 0);
+			if (data)
+				LOG(INFO) << "Load success with JPG extension.";
+			stbi_image_free(data);
+			return Texture((path + ".JPG"), width, height);	
 		}
+		
 		stbi_image_free(data);
-		return Texture(path, width, height);
+		return Texture((path + ".jpg"), width, height);
 	}
 
 private:

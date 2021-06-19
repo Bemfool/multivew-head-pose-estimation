@@ -195,32 +195,43 @@ private:
 			XMLElement *xml_transform = chunk->FirstChildElement("transform");
 			if (xml_transform != NULL)
 			{
-				const char* rotationText = xml_transform->FirstChildElement("rotation")->GetText();
-				const char* translationText = xml_transform->FirstChildElement("translation")->GetText();
-
-				char *rotation = const_cast<char *>(rotationText);
-				char *splits;
-				const char *d = " ";
-				splits = strtok(rotation, d);
-				int row = 0, col = 0;
-				while (splits)
+				XMLElement* xmlR = xml_transform->FirstChildElement("rotation");
+				if(xmlR == nullptr)
 				{
-					m_matModel(row, col) = atof(splits);
-					col++;
-					if (col == 3)
-					{
-						row++;
-						col = 0;
-					}
-					splits = strtok(NULL, d);
+					LOG(WARNING) << "No transform information found.";
+					// const char* sScale = xml_transform->FirstChildElement("scale")->GetText();
+					// m_matModel = Eigen::Matrix4f::Identity() / atof(sScale);
+					// m_matModel = Eigen::Matrix4f::Identity();
+					m_matModel.block(0, 0, 3, 3) = Eigen::Matrix3f::Identity();
 				}
-
-				char *translation = const_cast<char *>(translationText);
-				splits = strtok(translation, d);
-				for (int i = 0; i < 3; i++)
+				else
 				{
-					m_matModel(i, 3) = atof(splits);
-					splits = strtok(NULL, d);
+					const char* rotationText = xml_transform->FirstChildElement("rotation")->GetText();
+					const char* translationText = xml_transform->FirstChildElement("translation")->GetText();					
+					char *rotation = const_cast<char *>(rotationText);
+					char *splits;
+					const char *d = " ";
+					splits = strtok(rotation, d);
+					int row = 0, col = 0;
+					while (splits)
+					{
+						m_matModel(row, col) = atof(splits);
+						col++;
+						if (col == 3)
+						{
+							row++;
+							col = 0;
+						}
+						splits = strtok(NULL, d);
+					}
+
+					char *translation = const_cast<char *>(translationText);
+					splits = strtok(translation, d);
+					for (int i = 0; i < 3; i++)
+					{
+						m_matModel(i, 3) = atof(splits);
+						splits = strtok(NULL, d);
+					}
 				}
 			}
 
@@ -351,13 +362,13 @@ private:
 	Status loadTextures()
 	{
 		LOG(INFO) << "Load textures";
-
+		bool bIsSuccess;
 		m_aTextures.resize(m_nViews);
 
-		#pragma omp parallel for schedule(dynamic)
+		// #pragma omp parallel for schedule(dynamic)
 		for(std::size_t i = 0; i < m_nViews; ++i)
 		{
-			path pathTexture = m_pathPhotoDir / (file_utils::Id2Str(i) + ".jpg");
+			path pathTexture = m_pathPhotoDir / file_utils::Id2Str(i);
 			m_aTextures[i] = Texture::LoadTexture(pathTexture.string());
 		}
 

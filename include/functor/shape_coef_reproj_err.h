@@ -18,10 +18,12 @@ public:
 	MultiShapeCoefReprojErr(
 		const DetPairVector &aObjDetections, 
 		BfmManager *model, 
-		DataManager* pDataManager) : 
+		DataManager* pDataManager,
+		double dWeight = 10.0) : 
 		m_aObjDetections(aObjDetections), 
 		m_pModel(model), 
-		m_pDataManager(pDataManager) { }
+		m_pDataManager(pDataManager),
+		m_dWeight(dWeight) { }
 	
     template<typename _Tp>
 	bool operator () (const _Tp* const aShapeCoef, _Tp* aResiduals) const {
@@ -87,17 +89,18 @@ public:
 	static CostFunction *create(
 		const DetPairVector &aObjDetections, 
 		BfmManager* pModel, 
-		DataManager* pDataManager) 
+		DataManager* pDataManager,
+		double dWeight = 10.0) 
 	{
 		return (new AutoDiffCostFunction<MultiShapeCoefReprojErr, N_RES + N_ID_PCS, N_ID_PCS>(
-			new MultiShapeCoefReprojErr(aObjDetections, pModel, pDataManager)));
+			new MultiShapeCoefReprojErr(aObjDetections, pModel, pDataManager, dWeight)));
 	}
 
 private:
 	DetPairVector m_aObjDetections;
     BfmManager *m_pModel;
 	DataManager* m_pDataManager;
-	double m_dWeight = 10.0;
+	double m_dWeight;
 };
 
 

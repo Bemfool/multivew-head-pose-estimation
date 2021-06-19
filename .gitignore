@@ -2,7 +2,7 @@ build/
 .VSCodeCounter/
 log/
 
-run.sh
+*.sh
 
 # Data
 *.dat
@@ -12,6 +12,7 @@ run.sh
 *.avi
 *.jpg
 *.png
+*.off
 
 # Prerequisites
 *.d
