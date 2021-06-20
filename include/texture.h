@@ -30,7 +30,7 @@ public:
 		unsigned char *data = stbi_load((path + ".jpg").c_str(), &width, &height, &nrComponents, 0);
 		if (!data)
 		{
-			LOG(WARNING) << "Texture failed to load at path: " << path;
+			LOG(WARNING) << "Texture failed to load at path: " << path << ".jpg";
 			stbi_image_free(data);
 			data = stbi_load((path + ".JPG").c_str(), &width, &height, &nrComponents, 0);
 			if (data)

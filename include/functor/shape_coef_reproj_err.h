@@ -19,11 +19,13 @@ public:
 		const DetPairVector &aObjDetections, 
 		BfmManager *model, 
 		DataManager* pDataManager,
-		double dWeight = 10.0) : 
+		double dWeight,
+		std::vector<std::vector<bool>>& validList) : 
 		m_aObjDetections(aObjDetections), 
 		m_pModel(model), 
 		m_pDataManager(pDataManager),
-		m_dWeight(dWeight) { }
+		m_dWeight(dWeight),
+		m_validList(validList) { }
 	
     template<typename _Tp>
 	bool operator () (const _Tp* const aShapeCoef, _Tp* aResiduals) const {
@@ -62,11 +64,19 @@ public:
 			const auto vecPtsWC = bfm_utils::TransPoints(matCam, vecPtsMC);
 			for(auto j = 0u; j < N_LANDMARKS; j++) 
 			{
-				invZ = static_cast<_Tp>(1.0) / vecPtsWC(j * 3 + 2);
-				u = fx * vecPtsWC(j * 3) * invZ + cx;
-				v = fy * vecPtsWC(j * 3 + 1) * invZ + cy;
-				aResiduals[i * N_LANDMARKS * 2 + j * 2] = static_cast<_Tp>(m_aObjDetections[i].first.part(j).x()) - u;
-				aResiduals[i * N_LANDMARKS * 2 + j * 2 + 1] = static_cast<_Tp>(m_aObjDetections[i].first.part(j).y()) - v;
+
+				if(m_validList[i][j])
+				{
+					invZ = static_cast<_Tp>(1.0) / vecPtsWC(j * 3 + 2);
+					u = fx * vecPtsWC(j * 3) * invZ + cx;
+					v = fy * vecPtsWC(j * 3 + 1) * invZ + cy;
+					aResiduals[i * N_LANDMARKS * 2 + j * 2] = static_cast<_Tp>(m_aObjDetections[i].first.part(j).x()) - u;
+					aResiduals[i * N_LANDMARKS * 2 + j * 2 + 1] = static_cast<_Tp>(m_aObjDetections[i].first.part(j).y()) - v;
+				}
+				else
+				{
+					aResiduals[i * N_LANDMARKS * 2 + j * 2] = aResiduals[i * N_LANDMARKS * 2 + j * 2 + 1] = static_cast<_Tp>(0.0);					
+				}
 			}
 		}
 
@@ -90,10 +100,11 @@ public:
 		const DetPairVector &aObjDetections, 
 		BfmManager* pModel, 
 		DataManager* pDataManager,
-		double dWeight = 10.0) 
+		double dWeight,
+		std::vector<std::vector<bool>>& validList) 
 	{
 		return (new AutoDiffCostFunction<MultiShapeCoefReprojErr, N_RES + N_ID_PCS, N_ID_PCS>(
-			new MultiShapeCoefReprojErr(aObjDetections, pModel, pDataManager, dWeight)));
+			new MultiShapeCoefReprojErr(aObjDetections, pModel, pDataManager, dWeight, validList)));
 	}
 
 private:
@@ -101,50 +112,9 @@ private:
     BfmManager *m_pModel;
 	DataManager* m_pDataManager;
 	double m_dWeight;
+	std::vector<std::vector<bool>>& m_validList;
 };
 
-
-class ShapeCoefReprojErr {
-public:                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
-	ShapeCoefReprojErr(FullObjectDetection *observedPoints, BfmManager *model, std::vector<unsigned int> aLandmarkMap) 
-		: m_pObservedPoints(observedPoints), m_pModel(model), m_aLandmarkMap(aLandmarkMap) { }
-	
-    template<typename _Tp>
-	bool operator () (const _Tp* const aShapeCoef, _Tp* aResiduals) const {
-		_Tp fx = _Tp(m_pModel->getFx()), fy = _Tp(m_pModel->getFy());
-		_Tp cx = _Tp(m_pModel->getCx()), cy = _Tp(m_pModel->getCy());
-		
-		const Matrix<_Tp, Dynamic, 1> vecLandmarkBlendshape = m_pModel->genLandmarkBlendshapeByShape(aShapeCoef);  
-
-		const double *daExtParams = m_pModel->getExtParams().data();
-        _Tp *taExtParams = new _Tp[N_EXT_PARAMS];
-        for(unsigned int iParam = 0; iParam < N_EXT_PARAMS; iParam++)
-            taExtParams[iParam] = (_Tp)(daExtParams[iParam]);
-
-		const Matrix<_Tp, Dynamic, 1> vecLandmarkBlendshapeTransformed = bfm_utils::TransPoints(taExtParams, vecLandmarkBlendshape);
-
-		for(int iLandmark = 0; iLandmark < N_LANDMARKS; iLandmark++) 
-		{
-			unsigned int iDlibLandmarkIdx = m_aLandmarkMap[iLandmark];
-			_Tp u = fx * vecLandmarkBlendshapeTransformed(iLandmark * 3) / vecLandmarkBlendshapeTransformed(iLandmark * 3 + 2) + cx;
-			_Tp v = fy * vecLandmarkBlendshapeTransformed(iLandmark * 3 + 1) / vecLandmarkBlendshapeTransformed(iLandmark * 3 + 2) + cy;
-			aResiduals[iLandmark * 2] = _Tp(m_pObservedPoints->part(iDlibLandmarkIdx).x()) - u;
-			aResiduals[iLandmark * 2 + 1] = _Tp(m_pObservedPoints->part(iDlibLandmarkIdx).y()) - v;
-		}
-
-		return true;
-	}
-
-	static CostFunction *create(FullObjectDetection *observedPoints, BfmManager *model, std::vector<unsigned int> aLandmarkMap) {
-		return (new AutoDiffCostFunction<ShapeCoefReprojErr, N_LANDMARKS * 2, N_ID_PCS>(
-			new ShapeCoefReprojErr(observedPoints, model, aLandmarkMap)));
-	}
-
-private:
-	FullObjectDetection *m_pObservedPoints;
-	BfmManager *m_pModel;
-	std::vector<unsigned int> m_aLandmarkMap;
-};
 
 
 #endif // HPE_SHAPE_COEF_REPROJ_ERR_H

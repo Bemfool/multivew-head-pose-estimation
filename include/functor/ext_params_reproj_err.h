@@ -19,11 +19,13 @@ public:
 		const std::vector<std::pair<FullObjectDetection, int>> &aObjDetections, 
 		BfmManager *model, 
 		DataManager* pDataManager,
-		double scMean) : 
+		double scMean,
+		std::vector<std::vector<bool>>& validList) : 
 		m_aObjDetections(aObjDetections), 
 	    m_pModel(model), 
 		m_pDataManager(pDataManager),
-		m_scMean(scMean) { }
+		m_scMean(scMean),
+		m_validList(validList) { }
 	
 
     template<typename _Tp>
@@ -57,11 +59,18 @@ public:
 
 			for(auto j = 0; j < N_LANDMARKS; j++) 
 			{
-				invZ = static_cast<_Tp>(1.0) / vecTranPts(j * 3 + 2);
-				u = fx * vecTranPts(j * 3) * invZ + cx;
-				v = fy * vecTranPts(j * 3 + 1) * invZ + cy;
-				aResiduals[i * N_LANDMARKS * 2 + j * 2] = static_cast<_Tp>(m_aObjDetections[i].first.part(j).x()) - u;
-				aResiduals[i * N_LANDMARKS * 2 + j * 2 + 1] = static_cast<_Tp>(m_aObjDetections[i].first.part(j).y()) - v;
+				if(m_validList[iFace][j])
+				{
+					invZ = static_cast<_Tp>(1.0) / vecTranPts(j * 3 + 2);
+					u = fx * vecTranPts(j * 3) * invZ + cx;
+					v = fy * vecTranPts(j * 3 + 1) * invZ + cy;
+					aResiduals[i * N_LANDMARKS * 2 + j * 2] = static_cast<_Tp>(m_aObjDetections[i].first.part(j).x()) - u;
+					aResiduals[i * N_LANDMARKS * 2 + j * 2 + 1] = static_cast<_Tp>(m_aObjDetections[i].first.part(j).y()) - v;
+				}
+				else
+				{
+					aResiduals[i * N_LANDMARKS * 2 + j * 2] = aResiduals[i * N_LANDMARKS * 2 + j * 2 + 1] = static_cast<_Tp>(0.0);					
+				}
 			}
 		}
 
@@ -82,18 +91,20 @@ public:
 		const std::vector<std::pair<dlib::full_object_detection, int>> &aObjDetections, 
 		BfmManager *model, 
 		DataManager* pDataManager,
-		double scMean) 
+		double scMean,
+		std::vector<std::vector<bool>>& validList) 
 	{
 		return (new ceres::AutoDiffCostFunction<MultiExtParamsReprojErr, N_LANDMARKS * 2 * N_PHOTOS + 1, N_EXT_PARAMS, 1>(
-			new MultiExtParamsReprojErr(aObjDetections, model, pDataManager, scMean)));
+			new MultiExtParamsReprojErr(aObjDetections, model, pDataManager, scMean, validList)));
 	}
 
 private:
-	std::vector<std::pair<dlib::full_object_detection, int>> m_aObjDetections;
+	const std::vector<std::pair<dlib::full_object_detection, int>>& m_aObjDetections;
     BfmManager *m_pModel;
 	DataManager* m_pDataManager;
 	double m_scWeight = 1e6;
 	double m_scMean = 0.0;
+	std::vector<std::vector<bool>>& m_validList;
 };
 
 

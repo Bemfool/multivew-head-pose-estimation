@@ -27,7 +27,7 @@
 #include "functor/functor.h"
 #include "texture.h"
 #include "data_manager.h"
-
+#include "utils/2d_render_utils.h"
 
 using Eigen::Matrix;
 using Eigen::Vector3d;
@@ -72,15 +72,12 @@ public:
 
 private:
 
-
-	bool is_close_enough(double *ext_params, double rotation_eps = 0, double translation_eps = 0);
-
 	std::vector<double> estInit3dPts(const std::vector<DetPair>& vDetPairs);
 	double estInitSc(const std::vector<double>& vPts);
 	void estInitExtParams(std::vector<double>& vPts);
-	Summary estExtParams(const DetPairVector&  aObjDets, double scMean);
-	Summary estShapeCoef(const DetPairVector&  aObjDets, double dShapeWeight);
-	Summary estExprCoef(const DetPairVector&  aObjDets, double dExprWeight);
+	Summary estExtParams(const DetPairVector&  aObjDets, double scMean, std::vector<std::vector<bool>>& validList);
+	Summary estShapeCoef(const DetPairVector&  aObjDets, double dShapeWeight, std::vector<std::vector<bool>>& validList);
+	Summary estExprCoef(const DetPairVector&  aObjDets, double dExprWeight, std::vector<std::vector<bool>>& validList);
 	void initWin(
 		dlib::image_window& window, 
 		const std::string& sTitle, 
@@ -89,7 +86,12 @@ private:
 		bool bIsValid
 	);
 	void rmOutliers();
-	void showRes(std::vector<dlib::image_window>& vWins);
+	void rm2dLandmarkOutliers(std::vector<std::vector<bool>>& validList);
+	void showRes(
+		std::vector<dlib::image_window>& vWins,
+		const std::vector<std::vector<bool>>& validList,
+		const std::vector<DetPair>& aDetPairs
+	); 
 
 	shared_ptr<BfmManager> m_pBfmManager;
 	shared_ptr<DataManager> m_pDataManager;

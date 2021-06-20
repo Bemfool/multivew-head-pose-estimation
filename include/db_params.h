@@ -30,6 +30,7 @@ const unsigned int START = 4u;
 const unsigned int END = 24u;
 
 const double ZOOM_SCALE =  0.1;
+const std::size_t MAX_N_ITERATIONS = 3;
 
 namespace mhpe
 {
