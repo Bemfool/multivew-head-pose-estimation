@@ -4,6 +4,7 @@
 #include "db_params.h"
 #include "file_utils.h"
 #include "texture.h"
+#include "utils/2d_render_utils.h"
 
 #include "tinyxml2.h"
 
@@ -116,6 +117,7 @@ public:
 	double getWidth() const { return m_width; }
 	double getHeight() const { return m_height; }
 	unsigned int getNViews() const { return m_nViews; }
+	double getScale() const { return m_dZoomSc; }
 
 	const auto& getCameraMatrices() const {return m_aCameraMatrices; }
 	const auto& getProjMatrices() const { return m_aProjMatrices; }
@@ -433,21 +435,11 @@ private:
 			ObjDet objDet = m_shapePredictor(m_a2dTransImgs[iView], aRecs[0]);
 			m_aTransDets[iView] = objDet;
 
+			auto height = tex.getHeight() * m_dZoomSc;
+			auto width = tex.getWidth() * m_dZoomSc;
 			#pragma omp parallel for
 			for(auto j = 0; j < N_DLIB_LANDMARKS; j++)
-			{
-				auto x = objDet.part(j).x(), y = objDet.part(j).y();
-				if(m_aRotTypes[iView] == RotateType_CCW)
-				{
-					objDet.part(j).x() = tex.getWidth() * m_dZoomSc - y;
-					objDet.part(j).y() = x;
-				}
-				else
-				{
-					objDet.part(j).x() = y;
-					objDet.part(j).y() = tex.getHeight() * m_dZoomSc - x;
-				}
-			}
+				utils::RotateFromFront(objDet.part(j).x(), objDet.part(j).y(), height, width, m_aRotTypes[iView]);
 
 			m_aDets[iView] = objDet;
 		}

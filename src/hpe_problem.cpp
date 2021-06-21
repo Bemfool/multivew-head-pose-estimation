@@ -75,13 +75,13 @@ void MHPEProblem::solve(SolveExtParamsMode mode, double dShapeWeight, double dEx
 	for(auto iView = 0; iView < nViews; ++iView)
 	{
 		pb.update(1, "Create window No. " + std::to_string(iView));		
-		this->initWin(
-			winOrigin[iView], 
-			"Origin-" + std::to_string(iView),
-			a2dImgs[iView],
-			aDets[iView],
-			aRotTypes[iView] != RotateType_Invalid
-		);
+		// this->initWin(
+		// 	winOrigin[iView], 
+		// 	"Origin-" + std::to_string(iView),
+		// 	a2dImgs[iView],
+		// 	aDets[iView],
+		// 	aRotTypes[iView] != RotateType_Invalid
+		// );
 		this->initWin(
 			winTrans[iView],
 			"Trans-" + std::to_string(iView),
@@ -122,7 +122,7 @@ void MHPEProblem::solve(SolveExtParamsMode mode, double dShapeWeight, double dEx
 		rm2dLandmarkOutliers(validList);
 	} 
 	
-	this->showRes(winOrigin, validList, aDetPairs);
+	this->showRes(winTrans, validList, aDetPairs);
 
 	m_pBfmManager->genFace();
 	m_pBfmManager->writePly("output.ply", ModelWriteMode_CameraCoord);
@@ -376,6 +376,9 @@ void MHPEProblem::showRes(
 	
 	std::size_t nValidLandmarks;
 	double totalLoss = 0, loss;
+	auto height = m_pDataManager->getHeight() * m_pDataManager->getScale();
+	auto width = m_pDataManager->getWidth() * m_pDataManager->getScale();
+
 	for(auto i = 0; i < nViews; i++)
 	{	
 		loss = 0;
@@ -390,18 +393,24 @@ void MHPEProblem::showRes(
 			++nValidLandmarks;
 			int u = int(m_pBfmManager->getFx() * vecTranPts1(iLandmark * 3) / vecTranPts1(iLandmark * 3 + 2) + m_pBfmManager->getCx());
 			int v = int(m_pBfmManager->getFy() * vecTranPts1(iLandmark * 3 + 1) / vecTranPts1(iLandmark * 3 + 2) + m_pBfmManager->getCy());
+			int dstU = aDets[i].part(iLandmark).x();
+			int dstV = aDets[i].part(iLandmark).y();
+
+			utils::RotateToFront(u, v, height, width, aRotTypes[i]);
+			utils::RotateToFront(dstU, dstV, height, width, aRotTypes[i]);
+
 			aPts.emplace_back(u, v);
 			if(!validList[i][iLandmark]) continue;
 			aSrcPts.push_back(dlib::point(u, v));
-			aDstPts.emplace_back(aDets[i].part(iLandmark).x(), aDets[i].part(iLandmark).y());
-			loss += std::pow(aDets[i].part(iLandmark).x() - u, 2) + std::pow(aDets[i].part(iLandmark).y() - v, 2);
+			aDstPts.emplace_back(dstU, dstV);
+			loss += std::pow(dstU - u, 2) + std::pow(dstV - v, 2);
 		}
 		loss /= nValidLandmarks;
 		LOG(INFO) << "View:\t" << i << "\tMean landmark loss:\t" << std::sqrt(loss); 
 		totalLoss += loss;
 		vWins[i].add_overlay(dlib::render_face_detections(ObjDet(dlib::rectangle(), aPts), dlib::rgb_pixel(255, 0, 255)));
-		vWins[i].add_overlay(utils::renderPts(aDstPts, 2.0, dlib::rgb_pixel(255, 255, 0)));
-		vWins[i].add_overlay(utils::renderPts(aSrcPts, 2.0, dlib::rgb_pixel(0, 0, 255)));
+		vWins[i].add_overlay(utils::RenderPts(aDstPts, 2.0, dlib::rgb_pixel(255, 255, 0)));
+		vWins[i].add_overlay(utils::RenderPts(aSrcPts, 2.0, dlib::rgb_pixel(0, 0, 255))); // TODO
 	}
 	totalLoss /= aDetPairs.size();
 	LOG(INFO) << "Total mean landmark loss:\t" << std::sqrt(totalLoss);
@@ -420,7 +429,6 @@ void MHPEProblem::rm2dLandmarkOutliers(std::vector<std::vector<bool>>& validList
 	std::string sOutliers;
 
 	static double threshold = 8.0;
-
 	for(auto i = 0; i < nViews; i++)
 	{	
 		if(aRotTypes[i] == RotateType_Invalid) continue;
@@ -434,6 +442,7 @@ void MHPEProblem::rm2dLandmarkOutliers(std::vector<std::vector<bool>>& validList
 				continue;
 			int u = int(m_pBfmManager->getFx() * vecTranPts1(iLandmark * 3) / vecTranPts1(iLandmark * 3 + 2) + m_pBfmManager->getCx());
 			int v = int(m_pBfmManager->getFy() * vecTranPts1(iLandmark * 3 + 1) / vecTranPts1(iLandmark * 3 + 2) + m_pBfmManager->getCy());
+
 			aPoints.push_back(dlib::point(u, v));
 			auto loss = std::sqrt(std::pow(aDets[i].part(iLandmark).x() - u, 2) + std::pow(aDets[i].part(iLandmark).y() - v, 2));
 			
